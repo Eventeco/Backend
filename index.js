@@ -3,6 +3,8 @@ const cors = require("cors");
 const morgan = require("morgan");
 const { sendResponse } = require("./helper");
 
+const userRoutes = require("./routes/user");
+
 const PORT = process.env.PORT || "8080";
 
 const app = express();
@@ -12,10 +14,13 @@ app.use(cors({ origin: true }));
 app.use(express.json());
 app.use(morgan("dev"));
 
+//Routes
+app.use("/user", userRoutes);
+
 app.get("/", (_, res) => {
-  sendResponse(res, 200, "Hello World");
+	sendResponse(res, 200, "Hello World");
 });
 
 app.listen(PORT, () => {
-  console.log(`server started on port ${PORT}`);
+	console.log(`server started on port ${PORT}`);
 });
