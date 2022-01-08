@@ -1,4 +1,5 @@
 const { Pool, Client } = require("pg");
+const bcrypt = require("bcrypt");
 
 const sendError = (res, status, message) => {
 	res.status(status).send({ success: false, message: message });
@@ -16,20 +17,12 @@ const sendResponse = (res, status, data = null) => {
 	res.status(status).send(responseObject);
 };
 
-const cryptPassword = function (password, callback) {
-	bcrypt.genSalt(10, function (err, salt) {
-		if (err) return callback(err);
-
-		bcrypt.hash(password, salt, function (err, hash) {
-			return callback(err, hash);
-		});
-	});
+const cryptPassword = (password) => {
+	return bcrypt.hash(password, 10);
 };
 
-const comparePassword = function (plainPass, hashword, callback) {
-	bcrypt.compare(plainPass, hashword, function (err, isPasswordMatch) {
-		return err == null ? callback(null, isPasswordMatch) : callback(err);
-	});
+const comparePasswords = (password, hashedPassword) => {
+	return bcrypt.compare(password, hashedPassword);
 };
 
 const pool = new Pool({
@@ -43,10 +36,40 @@ const pool = new Pool({
 	},
 });
 
+const getUserByUsername = async (username) => {
+	const result = await pool.query("SELECT * FROM users WHERE username = $1", [
+		username,
+	]);
+	return result.rows[0];
+};
+
+const getUserById = async (id) => {
+	const result = await pool.query("SELECT * FROM users WHERE id = $1", [id]);
+	return result.rows[0];
+};
+
+const checkAuthenticated = (req, res, next) => {
+	if (req.isAuthenticated()) {
+		return next();
+	}
+	return sendError(res, 401, "unauthenticated");
+};
+
+const checkNotAuthenticated = (req, res, next) => {
+	if (req.isUnauthenticated()) {
+		return next();
+	}
+	return sendError(res, 400, "authenticated");
+};
+
 module.exports = {
 	sendError,
 	sendResponse,
 	pool,
 	cryptPassword,
-	comparePassword,
+	comparePasswords,
+	getUserByUsername,
+	getUserById,
+	checkAuthenticated,
+	checkNotAuthenticated,
 };
