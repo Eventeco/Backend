@@ -46,7 +46,15 @@ router.post("/register", checkNotAuthenticated, async (req, res) => {
 
 router.delete("/logout", checkAuthenticated, (req, res) => {
 	req.logOut();
-	sendResponse(res, 204);
+	sendResponse(res, 200);
+});
+
+router.get("/login-status", (req, res) => {
+	if (req.isAuthenticated()) {
+		sendResponse(res, 200, req.user);
+	} else {
+		sendError(res, 400);
+	}
 });
 
 module.exports = router;
