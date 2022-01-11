@@ -4,9 +4,12 @@ const morgan = require("morgan");
 const { getUserByUsername, getUserById } = require("./helper");
 const initializePassport = require("./passport-config");
 const session = require("express-session");
+const passport = require("passport");
+
 const authenticationRoutes = require("./routes/auth");
 const userRoutes = require("./routes/user");
-const passport = require("passport");
+const eventRoutes = require("./routes/events");
+const addressedIssuesRoutes = require("./routes/addressedIssues");
 
 const PORT = process.env.PORT || "8080";
 
@@ -31,6 +34,8 @@ app.use(passport.session());
 //Routes
 app.use("", authenticationRoutes);
 app.use("/user", userRoutes);
+app.use("/events", eventRoutes);
+app.use("/addressedIssues", addressedIssuesRoutes);
 
 app.listen(PORT, () => {
 	console.log(`server started on port ${PORT}`);

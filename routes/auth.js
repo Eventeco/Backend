@@ -25,7 +25,7 @@ router.post("/login", checkNotAuthenticated, function (req, res, next) {
 
 router.post("/register", checkNotAuthenticated, async (req, res) => {
 	const {
-		body: { username, email, password },
+		body: { name, username, email, password },
 	} = req;
 	if (!validator.validate(email)) {
 		sendError(res, 400, "Invalid Email Address");
@@ -34,13 +34,13 @@ router.post("/register", checkNotAuthenticated, async (req, res) => {
 	try {
 		const hashedPassword = await cryptPassword(password);
 		const result = await pool.query(
-			"INSERT INTO users (username, email, password) VALUES ($1, $2, $3) RETURNING *",
-			[username, email, hashedPassword],
+			"INSERT INTO users (firstname, username, email, password) VALUES ($1, $2, $3, $4) RETURNING *",
+			[name, username, email, hashedPassword],
 		);
 		sendResponse(res, 201, { user: result.rows[0] });
 	} catch (e) {
 		console.log(e);
-		sendError(res, 400, "some error occured");
+		sendError(res, 400, e.detail);
 	}
 });
 
