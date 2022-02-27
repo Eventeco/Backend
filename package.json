@@ -13,7 +13,8 @@
     "express-session": "^1.17.2",
     "passport": "^0.5.2",
     "passport-local": "^1.0.0",
-    "pg": "^8.7.1"
+    "pg": "^8.7.1",
+    "pg-format": "^1.0.4"
   },
   "scripts": {
     "start": "nodemon index.js"

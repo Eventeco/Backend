@@ -1,4 +1,4 @@
-const { Pool, Client } = require("pg");
+const { Pool } = require("pg");
 const bcrypt = require("bcrypt");
 
 const sendError = (res, status, message) => {
