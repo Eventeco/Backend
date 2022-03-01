@@ -10,17 +10,36 @@ var format = require("pg-format");
 const router = express.Router();
 
 //get all events
-router.get("/", async (_, res) => {
+// filter events by name, description, type, isDonationEnabled
+router.get("/", async (req, res) => {
+	const { name, description, type, isDonationEnabled, issues } = req.query;
+	const nameQuery = name ? format(` AND e.name ILIKE '%%%s%%'`, name) : "";
+	const descriptionQuery = description
+		? format(` AND e.description ILIKE '%%%s%%'`, description)
+		: "";
+	const typeQuery = type ? format(` AND e.type = %L`, type) : "";
+	const isDonationEnabledQuery =
+		isDonationEnabled === "true" ? ` AND e.isDonationEnabled = true` : "";
+
+	const issuesFilteringQuery = issues
+		? format(
+				`WHERE EXISTS (SELECT id FROM issuetypes WHERE id in (%s) )`,
+				issues.split(",").map(Number),
+		  )
+		: "";
+	const eventsFilteringQuery = `${nameQuery}${descriptionQuery}${typeQuery}${isDonationEnabledQuery}`;
+
+	const query = `SELECT e.*, json_agg(u) -> 0 AS user, json_agg(i) AS issues
+	FROM events AS e
+	JOIN users AS u ON e.creatorId = u.id AND e.deletedAt IS NULL ${eventsFilteringQuery}
+	JOIN addressedIssues AS a ON a.eventId = e.id
+	JOIN issuetypes AS i ON a.issuetypeid = i.id
+	${issuesFilteringQuery}
+	GROUP BY e.id
+	ORDER BY e.createdAt DESC`;
+
 	try {
-		const result = await pool.query(
-			`SELECT e.*, json_agg(u) -> 0 AS user, json_agg(i) AS issues 
-			FROM events AS e 
-			JOIN users AS u ON e.creatorId = u.id AND e.deletedAt IS NULL
-			JOIN addressedIssues AS a ON a.eventId = e.id 
-			JOIN issuetypes AS i ON a.issuetypeid = i.id 
-			GROUP BY e.id
-			ORDER BY e.createdAt DESC`,
-		);
+		const result = await pool.query(query);
 		sendResponse(res, 200, result.rows);
 	} catch (e) {
 		sendError(res, 400, e.message);
@@ -123,5 +142,4 @@ router.delete("/:id", async (req, res) => {
 module.exports = router;
 
 // todo:
-// filter events by name, issueTypes, description, type, isDonationEnabled
 // event geolocation filter with coordinates and radius
