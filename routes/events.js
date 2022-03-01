@@ -9,9 +9,8 @@ var format = require("pg-format");
 
 const router = express.Router();
 
-//get all events
-// filter events by name, description, type, isDonationEnabled
-router.get("/", async (req, res) => {
+//get all events and filter events by name, description, type, isDonationEnabled
+router.get("/", checkAuthenticated, async (req, res) => {
 	const { name, description, type, isDonationEnabled, issues } = req.query;
 	const nameQuery = name ? format(` AND e.name ILIKE '%%%s%%'`, name) : "";
 	const descriptionQuery = description
@@ -128,7 +127,7 @@ router.patch("/:id", checkAuthenticated, async (req, res) => {
 });
 
 //delete an event
-router.delete("/:id", async (req, res) => {
+router.delete("/:id", checkAuthenticated, async (req, res) => {
 	const { id } = req.params;
 	const query = `UPDATE events SET deletedAt = NOW() WHERE id = $1 AND deletedAt IS NULL`;
 	try {
