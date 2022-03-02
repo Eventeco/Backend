@@ -5,6 +5,7 @@ const {
 	sendResponse,
 	sendError,
 	checkIsEventCreator,
+	checkIsNotEventCreator,
 } = require("../helper");
 
 const router = express.Router();
@@ -38,16 +39,20 @@ router.get("/count/:eventId", checkAuthenticated, async (req, res) => {
 });
 
 //add participant to event by eventId and userId
-router.post("/", checkAuthenticated, async (req, res) => {
-	const { eventId, userId } = req.body;
-	const query = `INSERT INTO eventparticipants (eventid, userId) VALUES ($1, $2)`;
-	try {
-		await pool.query(query, [eventId, userId]);
-		sendResponse(res, 200);
-	} catch (e) {
-		sendError(res, 400, e.message);
-	}
-});
+router.post(
+	"/",
+	[checkAuthenticated, checkIsNotEventCreator],
+	async (req, res) => {
+		const { eventId, userId } = req.body;
+		const query = `INSERT INTO eventparticipants (eventid, userId) VALUES ($1, $2)`;
+		try {
+			await pool.query(query, [eventId, userId]);
+			sendResponse(res, 200);
+		} catch (e) {
+			sendError(res, 400, e.message);
+		}
+	},
+);
 
 //change didAttend status
 router.patch("/didAttend", checkAuthenticated, async (req, res) => {

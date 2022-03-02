@@ -62,19 +62,38 @@ const checkNotAuthenticated = (req, res, next) => {
 	return sendError(res, 400, "authenticated");
 };
 
-const checkIsEventCreator = (req, res, next) => {
-	const { eventId } = req.params;
-	const userId = req.user.id;
+const getEventCreator = async (eventId, userId) => {
 	const query = `SELECT * FROM events WHERE id = $1 AND creatorid = $2`;
-	pool.query(query, [eventId, userId], (err, result) => {
-		if (err) {
-			return sendError(res, 400, err.message);
+	const result = await pool.query(query, [eventId, userId]);
+	return result.rows[0];
+};
+
+const checkIsEventCreator = async (req, res, next) => {
+	const eventId = req.body.eventId || req.params.eventId;
+	const userId = req.user.id;
+	try {
+		const result = await getEventCreator(eventId, userId);
+		if (result) {
+			return next();
 		}
-		if (result.rows.length == 0) {
-			return sendError(res, 400, "not event creator");
+		return sendError(res, 400, "user is not an event creator");
+	} catch (e) {
+		return sendError(res, 400, e.message);
+	}
+};
+
+const checkIsNotEventCreator = async (req, res, next) => {
+	const eventId = req.body.eventId || req.params.eventId;
+	const userId = req.user.id;
+	try {
+		const result = await getEventCreator(eventId, userId);
+		if (!result) {
+			return next();
 		}
-		return next();
-	});
+		return sendError(res, 400, "user is an event creator");
+	} catch (e) {
+		return sendError(res, 400, e.message);
+	}
 };
 
 module.exports = {
@@ -88,4 +107,5 @@ module.exports = {
 	checkAuthenticated,
 	checkNotAuthenticated,
 	checkIsEventCreator,
+	checkIsNotEventCreator,
 };
