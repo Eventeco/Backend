@@ -62,6 +62,21 @@ const checkNotAuthenticated = (req, res, next) => {
 	return sendError(res, 400, "authenticated");
 };
 
+const checkIsEventCreator = (req, res, next) => {
+	const { eventId } = req.params;
+	const userId = req.user.id;
+	const query = `SELECT * FROM events WHERE id = $1 AND creatorid = $2`;
+	pool.query(query, [eventId, userId], (err, result) => {
+		if (err) {
+			return sendError(res, 400, err.message);
+		}
+		if (result.rows.length == 0) {
+			return sendError(res, 400, "not event creator");
+		}
+		return next();
+	});
+};
+
 module.exports = {
 	sendError,
 	sendResponse,
@@ -72,4 +87,5 @@ module.exports = {
 	getUserById,
 	checkAuthenticated,
 	checkNotAuthenticated,
+	checkIsEventCreator,
 };
