@@ -40,7 +40,6 @@ router.get("/count/:eventId", checkAuthenticated, async (req, res) => {
 //add participant to event by eventId and userId
 router.post("/", checkAuthenticated, async (req, res) => {
 	const { eventId, userId } = req.body;
-	console.log(eventId, userId);
 	const query = `INSERT INTO eventparticipants (eventid, userId) VALUES ($1, $2)`;
 	try {
 		await pool.query(query, [eventId, userId]);

@@ -39,7 +39,6 @@ router.post("/register", checkNotAuthenticated, async (req, res) => {
 		);
 		sendResponse(res, 201, { user: result.rows[0] });
 	} catch (e) {
-		console.log(e);
 		sendError(res, 400, e.detail);
 	}
 });
