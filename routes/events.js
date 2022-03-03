@@ -26,14 +26,13 @@ router.get("/", checkAuthenticated, async (req, res) => {
 	const eventsFilteringQuery = `${nameQuery}${descriptionQuery}${typeQuery}${isDonationEnabledQuery}`;
 
 	const query = `SELECT e.*, json_agg(u) -> 0 AS user, json_agg(i) AS issues
-	FROM events AS e
-	JOIN users AS u ON e.creatorId = u.id AND e.deletedAt IS NULL ${eventsFilteringQuery}
-	JOIN addressedIssues AS a ON a.eventId = e.id
-	JOIN issuetypes AS i ON a.issuetypeid = i.id
-	${issuesFilteringQuery}
-	GROUP BY e.id
-	ORDER BY e.createdAt DESC`;
-
+					FROM events AS e
+					JOIN users AS u ON e.creatorId = u.id AND e.deletedAt IS NULL ${eventsFilteringQuery}
+					JOIN addressedIssues AS a ON a.eventId = e.id
+					JOIN issuetypes AS i ON a.issuetypeid = i.id
+					${issuesFilteringQuery}
+					GROUP BY e.id
+					ORDER BY e.createdAt DESC`;
 	try {
 		const result = await pool.query(query);
 		sendResponse(res, 200, result.rows);
@@ -45,22 +44,20 @@ router.get("/", checkAuthenticated, async (req, res) => {
 //get suggested events based on event issues
 router.get("/suggested/:id", checkAuthenticated, async (req, res) => {
 	const { id } = req.params;
+	const query = `SELECT e.*, json_agg(u) -> 0 AS user, json_agg(i) AS issues 
+					FROM events AS e
+					JOIN users AS u ON e.creatorId = u.id AND e.id != $1 AND e.deletedAt IS NULL
+					JOIN addressedIssues AS a ON a.eventId = e.id 
+					JOIN issuetypes AS i ON a.issuetypeid = i.id AND i.id IN (
+						SELECT i.id 
+						FROM addressedIssues AS a 
+						JOIN issuetypes AS i 
+						ON a.issuetypeid = i.id 
+						WHERE a.eventId = $1)
+					GROUP BY e.id
+					ORDER BY e.createdAt DESC`;
 	try {
-		const result = await pool.query(
-			`SELECT e.*, json_agg(u) -> 0 AS user, json_agg(i) AS issues 
-			FROM events AS e
-			JOIN users AS u ON e.creatorId = u.id AND e.id != $1 AND e.deletedAt IS NULL
-			JOIN addressedIssues AS a ON a.eventId = e.id 
-			JOIN issuetypes AS i ON a.issuetypeid = i.id AND i.id IN (
-				SELECT i.id 
-				FROM addressedIssues AS a 
-				JOIN issuetypes AS i 
-				ON a.issuetypeid = i.id 
-				WHERE a.eventId = $1)
-			GROUP BY e.id
-			ORDER BY e.createdAt DESC`,
-			[id],
-		);
+		const result = await pool.query(query, [id]);
 		sendResponse(res, 200, result.rows);
 	} catch (e) {
 		sendError(res, 400, e.message);

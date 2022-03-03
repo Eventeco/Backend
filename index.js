@@ -11,6 +11,7 @@ const userRoutes = require("./routes/user");
 const eventRoutes = require("./routes/events");
 const addressedIssuesRoutes = require("./routes/addressedIssues");
 const eventParticipantsRoutes = require("./routes/eventParticipants");
+const userPastEventsRoutes = require("./routes/userPastEvents");
 
 const PORT = process.env.PORT || "8080";
 
@@ -38,6 +39,7 @@ app.use("/user", userRoutes);
 app.use("/events", eventRoutes);
 app.use("/addressedIssues", addressedIssuesRoutes);
 app.use("/eventParticipants", eventParticipantsRoutes);
+app.use("/userPastEvents", userPastEventsRoutes);
 
 app.listen(PORT, () => {
 	console.log(`server started on port ${PORT}`);
