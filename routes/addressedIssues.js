@@ -1,10 +1,6 @@
 const express = require("express");
-const {
-	checkAuthenticated,
-	pool,
-	sendResponse,
-	sendError,
-} = require("../helper");
+const { sendResponse, sendError } = require("../helper");
+const pool = require("../dbPool");
 
 const router = express.Router();
 

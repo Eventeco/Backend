@@ -1,14 +1,9 @@
 const express = require("express");
 const validator = require("email-validator");
-const {
-	sendError,
-	sendResponse,
-	pool,
-	cryptPassword,
-	checkNotAuthenticated,
-	checkAuthenticated,
-} = require("../helper");
+const { sendError, sendResponse, cryptPassword } = require("../helper");
 const passport = require("passport");
+const pool = require("../dbPool");
+const { checkNotAuthenticated, checkAuthenticated } = require("../middlewares");
 
 const router = express.Router();
 

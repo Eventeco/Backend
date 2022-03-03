@@ -1,12 +1,6 @@
 const express = require("express");
-const validator = require("email-validator");
-const {
-	sendError,
-	sendResponse,
-	pool,
-	getUserByUsername,
-	checkAuthenticated,
-} = require("../helper");
+const { sendError, sendResponse, getUserByUsername } = require("../helper");
+const { checkAuthenticated } = require("../middlewares");
 
 const router = express.Router();
 

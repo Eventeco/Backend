@@ -1,11 +1,8 @@
 const express = require("express");
-const {
-	checkAuthenticated,
-	pool,
-	sendResponse,
-	sendError,
-} = require("../helper");
-var format = require("pg-format");
+const { sendResponse, sendError } = require("../helper");
+const format = require("pg-format");
+const pool = require("../dbPool");
+const { checkAuthenticated, checkIsEventCreator } = require("../middlewares");
 
 const router = express.Router();
 
@@ -127,16 +124,20 @@ router.patch("/:id", checkAuthenticated, async (req, res) => {
 });
 
 //delete an event
-router.delete("/:id", checkAuthenticated, async (req, res) => {
-	const { id } = req.params;
-	const query = `UPDATE events SET deletedAt = NOW() WHERE id = $1 AND deletedAt IS NULL`;
-	try {
-		await pool.query(query, [id]);
-		sendResponse(res, 200);
-	} catch (e) {
-		sendError(res, 400, e.message);
-	}
-});
+router.delete(
+	"/:eventId",
+	[checkAuthenticated, checkIsEventCreator],
+	async (req, res) => {
+		const { eventId } = req.params;
+		const query = `UPDATE events SET deletedAt = NOW() WHERE id = $1 AND deletedAt IS NULL`;
+		try {
+			await pool.query(query, [eventId]);
+			sendResponse(res, 200);
+		} catch (e) {
+			sendError(res, 400, e.message);
+		}
+	},
+);
 
 module.exports = router;
 

@@ -1,12 +1,11 @@
 const express = require("express");
+const { sendResponse, sendError } = require("../helper");
+const pool = require("../dbPool");
 const {
-	checkAuthenticated,
-	pool,
-	sendResponse,
-	sendError,
 	checkIsEventCreator,
 	checkIsNotEventCreator,
-} = require("../helper");
+	checkAuthenticated,
+} = require("../middlewares");
 
 const router = express.Router();
 
@@ -74,7 +73,10 @@ router.delete("/:eventId/:userId", checkAuthenticated, async (req, res) => {
 	const { eventId, userId } = req.params;
 	const query = `DELETE FROM eventparticipants WHERE eventid = $1 AND userId = $2`;
 	try {
-		await pool.query(query, [eventId, userId]);
+		const result = await pool.query(query, [eventId, userId]);
+		if (result.rowCount == 0) {
+			return sendError(res, 400, "user is not a participant");
+		}
 		sendResponse(res, 200);
 	} catch (e) {
 		sendError(res, 400, e.message);
