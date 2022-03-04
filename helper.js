@@ -43,6 +43,43 @@ const getEventCreator = async (eventId, userId) => {
 	return result.rows[0];
 };
 
+const getEvent = async (eventId) => {
+	const query = `SELECT * FROM events WHERE id = $1`;
+	const result = await pool.query(query, [eventId]);
+	return result.rows[0];
+};
+
+const getUserJoinedPendingEvents = async (userId) => {
+	const query = `SELECT e.* 
+		FROM events AS e 
+		JOIN eventparticipants AS ep 
+		ON e.id = ep.eventid AND ep.userid = $1 AND ep.didattend IS NULL`;
+
+	const result = await pool.query(query, [userId]);
+	return result.rows;
+};
+
+const getDate = (date) => {
+	return new Date(date).toISOString().split("T")[0];
+};
+
+const checkUserHasNotJoinedEventOnSameDay = async (eventId, userId) => {
+	const userEvents = await getUserJoinedPendingEvents(userId);
+	if (userEvents.length === 0) {
+		return true;
+	}
+	const eventToJoin = await getEvent(eventId);
+	const eventToJoinDate = getDate(eventToJoin.starttime);
+
+	for (let currEvent of userEvents) {
+		if (getDate(currEvent.starttime) === eventToJoinDate) {
+			return false;
+		}
+	}
+
+	return true;
+};
+
 module.exports = {
 	sendError,
 	sendResponse,
@@ -51,4 +88,5 @@ module.exports = {
 	getUserByUsername,
 	getUserById,
 	getEventCreator,
+	checkUserHasNotJoinedEventOnSameDay,
 };
