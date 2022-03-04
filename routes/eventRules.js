@@ -8,7 +8,7 @@ const router = express.Router();
 //get rules by eventId
 router.get("/:eventId", checkAuthenticated, async (req, res) => {
 	const { eventId } = req.params;
-	const query = "SELECT * FROM eventRules WHERE eventId=$1";
+	const query = "SELECT id, rule FROM eventRules WHERE eventId=$1";
 	try {
 		const results = await pool.query(query, [eventId]);
 		if (results.rows.length === 0) {
@@ -26,6 +26,9 @@ router.post(
 	[checkAuthenticated, checkIsEventCreator],
 	async (req, res) => {
 		const { rule, eventId } = req.body;
+		if (!rule) {
+			return sendError(res, 400, "No rule provided");
+		}
 		const query =
 			"INSERT INTO eventRules (eventId, rule) VALUES ($1, $2) RETURNING *";
 		try {
@@ -43,6 +46,9 @@ router.patch(
 	[checkAuthenticated, checkIsEventCreator],
 	async (req, res) => {
 		const { rule, ruleId } = req.body;
+		if (!rule) {
+			return sendError(res, 400, "No rule provided");
+		}
 		const query = "UPDATE eventRules SET rule=$1 WHERE id=$2 RETURNING *";
 		try {
 			const results = await pool.query(query, [rule, ruleId]);
