@@ -16,6 +16,9 @@ const checkNotAuthenticated = (req, res, next) => {
 
 const checkIsEventCreator = async (req, res, next) => {
 	const eventId = req.body.eventId || req.params.eventId;
+	if (!eventId) {
+		return sendError(res, 400, "eventId is required");
+	}
 	const userId = req.user.id;
 	try {
 		const result = await getEventCreator(eventId, userId);
@@ -30,6 +33,9 @@ const checkIsEventCreator = async (req, res, next) => {
 
 const checkIsNotEventCreator = async (req, res, next) => {
 	const eventId = req.body.eventId || req.params.eventId;
+	if (!eventId) {
+		return sendError(res, 400, "eventId is required");
+	}
 	const userId = req.user.id;
 	try {
 		const result = await getEventCreator(eventId, userId);
