@@ -2,6 +2,7 @@ const express = require("express");
 const { sendResponse, sendError } = require("../helper");
 const pool = require("../dbPool");
 const { checkAuthenticated, checkIsEventCreator } = require("../middlewares");
+const isImageURL = require("image-url-validator").default;
 
 const router = express.Router();
 
@@ -28,6 +29,10 @@ router.post(
 		const { picturePath, eventId } = req.body;
 		if (!picturePath) {
 			return sendError(res, 400, "No picture path provided");
+		}
+		const isValidImageURL = await isImageURL(picturePath);
+		if (!isValidImageURL) {
+			return sendError(res, 400, "Invalid picture path");
 		}
 		const query =
 			"INSERT INTO eventPictures (eventId, picturePath) VALUES ($1, $2) RETURNING *";

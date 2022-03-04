@@ -1,5 +1,5 @@
 {
-  "name": "EventECO-Backend",
+  "name": "eventeco-backend",
   "version": "1.0.0",
   "main": "index.js",
   "repository": "https://github.com/Eventeco/Backend.git",
@@ -11,6 +11,7 @@
     "email-validator": "^2.0.4",
     "express": "^4.17.2",
     "express-session": "^1.17.2",
+    "image-url-validator": "^1.0.4",
     "passport": "^0.5.2",
     "passport-local": "^1.0.0",
     "pg": "^8.7.1",
