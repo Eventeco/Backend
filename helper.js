@@ -80,6 +80,11 @@ const checkUserHasNotJoinedEventOnSameDay = async (eventId, userId) => {
 	return true;
 };
 
+const verifyUserPassword = async (userId, password) => {
+	const user = await getUserById(userId);
+	return await comparePasswords(password, user.password);
+};
+
 module.exports = {
 	sendError,
 	sendResponse,
@@ -89,4 +94,5 @@ module.exports = {
 	getUserById,
 	getEventCreator,
 	checkUserHasNotJoinedEventOnSameDay,
+	verifyUserPassword,
 };
