@@ -70,6 +70,27 @@ router.get("/suggested/:id", checkAuthenticated, async (req, res) => {
 	}
 });
 
+//get event by id
+router.get("/:id", checkAuthenticated, async (req, res) => {
+	const { id } = req.params;
+	const query = `SELECT e.*, json_agg(u) -> 0 AS user,
+					COALESCE(json_agg(DISTINCT i) FILTER (WHERE i.id IS NOT NULL), '[]') AS issues,
+					COALESCE(json_agg(DISTINCT jsonb_build_object('id', er.id, 'rule', er.rule)) FILTER (WHERE er.id IS NOT NULL), '[]') AS rules
+					FROM events AS e
+					JOIN users AS u ON e.creatorId = u.id AND e.id = $1 AND e.deletedAt IS NULL
+					LEFT JOIN eventRules AS er ON er.eventId = e.id
+					LEFT JOIN addressedIssues AS a ON a.eventId = e.id
+					JOIN issuetypes AS i ON a.issuetypeid = i.id
+					GROUP BY e.id
+					ORDER BY e.createdAt DESC`;
+	try {
+		const result = await pool.query(query, [id]);
+		sendResponse(res, 200, result.rows);
+	} catch (e) {
+		sendError(res, 400, e.message);
+	}
+});
+
 //create an event
 router.post("/", checkAuthenticated, async (req, res) => {
 	const { issueIds, rules, ...eventData } = req.body;
@@ -123,14 +144,14 @@ router.post("/", checkAuthenticated, async (req, res) => {
 
 //edit an event
 router.patch(
-	"/:eventId",
+	"/",
 	[checkAuthenticated, checkIsEventCreator],
 	async (req, res) => {
-		const {
-			body,
-			params: { eventId },
-		} = req;
-		const sets = Object.entries(body).map(([key, value]) =>
+		const { eventId, ...eventData } = req.body;
+		if (!eventId) {
+			return sendError(res, 400, "Please provide an event id");
+		}
+		const sets = Object.entries(eventData).map(([key, value]) =>
 			format("%s = %L", key, value),
 		);
 
