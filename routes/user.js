@@ -59,7 +59,8 @@ router.get("/check-event/:userId/event/:eventId", async (req, res) => {
 
 //change user password
 router.patch("/change-password", checkAuthenticated, async (req, res) => {
-	const { userId, oldPassword, newPassword } = req.body;
+	const { oldPassword, newPassword } = req.body;
+	const userId = req.user.id;
 	if (!newPassword) {
 		return sendError(res, 400, "No new password provided");
 	}
@@ -83,7 +84,10 @@ router.patch("/change-password", checkAuthenticated, async (req, res) => {
 
 //change user details
 router.patch("/", checkAuthenticated, async (req, res) => {
-	const { userId, password, ...dataToChange } = req.body;
+	const { password, ...dataToChange } = req.body;
+	const userId = req.user.id;
+
+	delete dataToChange.password;
 
 	const sets = Object.entries(dataToChange).map(([key, value]) =>
 		format("%s = %L", key, value),
@@ -106,12 +110,13 @@ router.patch("/", checkAuthenticated, async (req, res) => {
 });
 
 //delete user
-router.delete("/:userId", checkAuthenticated, async (req, res) => {
-	const { userId } = req.params;
+router.delete("/", checkAuthenticated, async (req, res) => {
+	const userId = req.user.id;
 	const query =
 		"UPDATE users SET deletedAt=NOW() WHERE id=$1 AND deletedAt IS NULL";
 	try {
 		await pool.query(query, [userId]);
+		req.logOut();
 		sendResponse(res, 200);
 	} catch (e) {
 		sendError(res, 400, e.message);

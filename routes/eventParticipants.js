@@ -42,7 +42,8 @@ router.post(
 	"/",
 	[checkAuthenticated, checkIsNotEventCreator],
 	async (req, res) => {
-		const { eventId, userId } = req.body;
+		const { eventId } = req.body;
+		const userId = req.user.id;
 		const query = `INSERT INTO eventparticipants (eventid, userId) VALUES ($1, $2)`;
 		try {
 			await pool.query(query, [eventId, userId]);
@@ -54,23 +55,28 @@ router.post(
 );
 
 //change didAttend status
-router.patch("/didAttend", checkAuthenticated, async (req, res) => {
-	const { eventId, userId, didAttend } = req.body;
-	const query = `UPDATE eventparticipants SET didattend = $1 WHERE eventid = $2 AND userid = $3 RETURNING *`;
-	try {
-		const result = await pool.query(query, [didAttend, eventId, userId]);
-		if (result.rows.length == 0) {
-			return sendError(res, 400, "user is not a participant");
+router.patch(
+	"/didAttend",
+	[checkAuthenticated, checkIsEventCreator],
+	async (req, res) => {
+		const { eventId, userId, didAttend } = req.body;
+		const query = `UPDATE eventparticipants SET didattend = $1 WHERE eventid = $2 AND userid = $3 RETURNING *`;
+		try {
+			const result = await pool.query(query, [didAttend, eventId, userId]);
+			if (result.rows.length == 0) {
+				return sendError(res, 400, "user is not a participant");
+			}
+			sendResponse(res, 200, result.rows[0]);
+		} catch (e) {
+			sendError(res, 400, e.message);
 		}
-		sendResponse(res, 200, result.rows[0]);
-	} catch (e) {
-		sendError(res, 400, e.message);
-	}
-});
+	},
+);
 
 //delete participant from event by eventId and userId
-router.delete("/:eventId/:userId", checkAuthenticated, async (req, res) => {
-	const { eventId, userId } = req.params;
+router.delete("/:eventId", checkAuthenticated, async (req, res) => {
+	const { eventId } = req.params;
+	const userId = req.user.id;
 	const query = `DELETE FROM eventparticipants WHERE eventid = $1 AND userId = $2`;
 	try {
 		const result = await pool.query(query, [eventId, userId]);

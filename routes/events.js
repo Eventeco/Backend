@@ -104,6 +104,7 @@ router.post("/", checkAuthenticated, async (req, res) => {
 	if (rules && rules.length === 0) {
 		return sendError(res, 400, "Please add atleast one rule");
 	}
+	eventData.creatorId = req.user.id;
 	const cols = Object.keys(eventData);
 	const values = Object.values(eventData);
 	const eventQuery = format(
@@ -152,6 +153,7 @@ router.patch(
 	[checkAuthenticated, checkIsEventCreator],
 	async (req, res) => {
 		const { eventId, ...eventData } = req.body;
+		delete eventData.creatorId;
 		if (!eventId) {
 			return sendError(res, 400, "Please provide an event id");
 		}

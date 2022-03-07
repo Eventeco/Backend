@@ -6,8 +6,8 @@ const { checkAuthenticated } = require("../middlewares");
 const router = express.Router();
 
 //get user past participated events
-router.get("/participated/:userId", checkAuthenticated, async (req, res) => {
-	const { userId } = req.params;
+router.get("/participated", checkAuthenticated, async (req, res) => {
+	const userId = req.user.id;
 	const query = `SELECT e.*, json_agg(u) -> 0 AS user, json_agg(i) AS issues 
                     FROM events as e 
                     JOIN eventParticipants as p ON e.id=p.eventId AND p.userId=$1 AND e.deletedAt IS NULL
@@ -25,8 +25,8 @@ router.get("/participated/:userId", checkAuthenticated, async (req, res) => {
 });
 
 //get user past created events
-router.get("/created/:userId", checkAuthenticated, async (req, res) => {
-	const { userId } = req.params;
+router.get("/created", checkAuthenticated, async (req, res) => {
+	const userId = req.user.id;
 	const query = `SELECT e.*, json_agg(u) -> 0 AS user, json_agg(i) AS issues
                     FROM events as e
                     JOIN users as u ON e.creatorId=u.id AND e.creatorId=$1 AND e.deletedAt IS NULL

@@ -1,13 +1,22 @@
 const express = require("express");
 const validator = require("email-validator");
-const { sendError, sendResponse, cryptPassword } = require("../helper");
+const {
+	sendError,
+	sendResponse,
+	cryptPassword,
+	isUserDeletedByUsername,
+} = require("../helper");
 const passport = require("passport");
 const pool = require("../dbPool");
 const { checkNotAuthenticated, checkAuthenticated } = require("../middlewares");
 
 const router = express.Router();
 
-router.post("/login", checkNotAuthenticated, function (req, res, next) {
+router.post("/login", checkNotAuthenticated, async (req, res, next) => {
+	const isUserDeleted = await isUserDeletedByUsername(req.body.username);
+	if (isUserDeleted) {
+		return sendError(res, 400, "User is deleted");
+	}
 	passport.authenticate("local", function (err, user, info) {
 		if (err) return sendError(res, 500);
 		if (!user) return sendError(res, 400, info.message);

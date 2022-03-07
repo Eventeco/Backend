@@ -85,6 +85,11 @@ const verifyUserPassword = async (userId, password) => {
 	return await comparePasswords(password, user.password);
 };
 
+const isUserDeletedByUsername = async (username) => {
+	const user = await getUserByUsername(username);
+	return user.deletedat ? true : false;
+};
+
 module.exports = {
 	sendError,
 	sendResponse,
@@ -95,4 +100,5 @@ module.exports = {
 	getEventCreator,
 	checkUserHasNotJoinedEventOnSameDay,
 	verifyUserPassword,
+	isUserDeletedByUsername,
 };
