@@ -94,8 +94,12 @@ router.get("/:id", checkAuthenticated, async (req, res) => {
 //create an event
 router.post("/", checkAuthenticated, async (req, res) => {
 	const { issueIds, rules, ...eventData } = req.body;
-	if (issueIds && issueIds.length === 0) {
-		return sendError(res, 400, "Please select atleast one issue");
+	if (issueIds) {
+		if (issueIds.length === 0) {
+			return sendError(res, 400, "Please select atleast one issue");
+		} else if (issueIds.length > 3) {
+			return sendError(res, 400, "Please select only a maximum of 3 issues");
+		}
 	}
 	if (rules && rules.length === 0) {
 		return sendError(res, 400, "Please add atleast one rule");

@@ -21,14 +21,24 @@ router.get("/:id", checkAuthenticated, async (req, res) => {
 
 //add new addressed issue to event
 router.post(
-	"/:issueId/event/:eventId",
+	"/",
 	[checkAuthenticated, checkIsEventCreator],
 	async (req, res) => {
-		const { issueId, eventId } = req.params;
-		const query =
+		const { issueId, eventId } = req.body;
+		const issueCountQuery = `SELECT COUNT(*) FROM addressedIssues WHERE eventId=$1`;
+		const insertQuery =
 			"INSERT INTO addressedIssues (eventId, issueTypeId) VALUES ($1, $2) RETURNING *";
 		try {
-			const results = await pool.query(query, [eventId, issueId]);
+			const issueCountResult = await pool.query(issueCountQuery, [eventId]);
+			const issueCount = issueCountResult.rows[0].count;
+			if (issueCount >= 3) {
+				return sendError(
+					res,
+					400,
+					"You can only add a maximum of 3 issues to an event",
+				);
+			}
+			const results = await pool.query(insertQuery, [eventId, issueId]);
 			sendResponse(res, 200, results.rows[0]);
 		} catch (e) {
 			sendError(res, 400, e.message);
@@ -45,7 +55,7 @@ router.delete(
 		const query =
 			"DELETE FROM addressedIssues WHERE eventId=$1 AND issueTypeId=$2";
 		try {
-			const results = await pool.query(query, [eventId, issueId]);
+			await pool.query(query, [eventId, issueId]);
 			sendResponse(res, 200);
 		} catch (e) {
 			sendError(res, 400, e.message);
