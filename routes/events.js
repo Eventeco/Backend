@@ -1,5 +1,11 @@
 const express = require("express");
-const { sendResponse, sendError } = require("../helper");
+const {
+	sendResponse,
+	sendError,
+	getEvents,
+	s3PutBase64Image,
+	s3DeleteImage,
+} = require("../helper");
 const format = require("pg-format");
 const pool = require("../dbPool");
 const { checkAuthenticated, checkIsEventCreator } = require("../middlewares");
@@ -25,19 +31,11 @@ router.get("/", checkAuthenticated, async (req, res) => {
 		: "";
 	const eventsFilteringQuery = `${nameQuery}${descriptionQuery}${typeQuery}${isDonationEnabledQuery}`;
 
-	const query = `SELECT e.*, json_agg(u) -> 0 AS user, 
-					COALESCE(json_agg(DISTINCT i) FILTER (WHERE i.id IS NOT NULL), '[]') AS issues, 
-					COALESCE(json_agg(DISTINCT jsonb_build_object('id', er.id, 'rule', er.rule)) FILTER (WHERE er.id IS NOT NULL), '[]') AS rules
-					FROM events AS e
-					JOIN users AS u ON e.creatorId = u.id AND e.deletedAt IS NULL ${eventsFilteringQuery}
-					LEFT JOIN eventRules AS er ON er.eventId = e.id
-					LEFT JOIN addressedIssues AS a ON a.eventId = e.id
-					JOIN issuetypes AS i ON a.issuetypeid = i.id
-					${issuesFilteringQuery}
-					GROUP BY e.id
-					ORDER BY e.createdAt DESC`;
 	try {
-		const result = await pool.query(query);
+		const result = await getEvents({
+			issuesFilteringQuery,
+			eventsFilteringQuery,
+		});
 		sendResponse(res, 200, result.rows);
 	} catch (e) {
 		sendError(res, 400, e.message);
@@ -47,23 +45,19 @@ router.get("/", checkAuthenticated, async (req, res) => {
 //get suggested events based on event issues
 router.get("/suggested/:id", checkAuthenticated, async (req, res) => {
 	const { id } = req.params;
-	const query = `SELECT e.*, json_agg(u) -> 0 AS user, 
-					COALESCE(json_agg(DISTINCT i) FILTER (WHERE i.id IS NOT NULL), '[]') AS issues, 
-					COALESCE(json_agg(DISTINCT jsonb_build_object('id', er.id, 'rule', er.rule)) FILTER (WHERE er.id IS NOT NULL), '[]') AS rules
-					FROM events AS e
-					JOIN users AS u ON e.creatorId = u.id AND e.id != $1 AND e.deletedAt IS NULL
-					LEFT JOIN eventRules AS er ON er.eventId = e.id
-					LEFT JOIN addressedIssues AS a ON a.eventId = e.id 
-					JOIN issuetypes AS i ON a.issuetypeid = i.id WHERE EXISTS (
-						SELECT i.id 
-						FROM addressedIssues AS a 
-						JOIN issuetypes AS i 
-						ON a.issuetypeid = i.id 
-						WHERE a.eventId = $1)
-					GROUP BY e.id
-					ORDER BY e.createdAt DESC`;
+	const issuesFilteringQuery = ` WHERE EXISTS (
+		SELECT i.id 
+		FROM addressedIssues AS a 
+		JOIN issuetypes AS i 
+		ON a.issuetypeid = i.id 
+		WHERE a.eventId = $1)`;
+
 	try {
-		const result = await pool.query(query, [id]);
+		const result = await getEvents({
+			issuesFilteringQuery,
+			id,
+			suggested: true,
+		});
 		sendResponse(res, 200, result.rows);
 	} catch (e) {
 		sendError(res, 400, e.message);
@@ -73,18 +67,8 @@ router.get("/suggested/:id", checkAuthenticated, async (req, res) => {
 //get event by id
 router.get("/:id", checkAuthenticated, async (req, res) => {
 	const { id } = req.params;
-	const query = `SELECT e.*, json_agg(u) -> 0 AS user,
-					COALESCE(json_agg(DISTINCT i) FILTER (WHERE i.id IS NOT NULL), '[]') AS issues,
-					COALESCE(json_agg(DISTINCT jsonb_build_object('id', er.id, 'rule', er.rule)) FILTER (WHERE er.id IS NOT NULL), '[]') AS rules
-					FROM events AS e
-					JOIN users AS u ON e.creatorId = u.id AND e.id = $1 AND e.deletedAt IS NULL
-					LEFT JOIN eventRules AS er ON er.eventId = e.id
-					LEFT JOIN addressedIssues AS a ON a.eventId = e.id
-					JOIN issuetypes AS i ON a.issuetypeid = i.id
-					GROUP BY e.id
-					ORDER BY e.createdAt DESC`;
 	try {
-		const result = await pool.query(query, [id]);
+		const result = await getEvents({ id });
 		sendResponse(res, 200, result.rows);
 	} catch (e) {
 		sendError(res, 400, e.message);
@@ -93,7 +77,7 @@ router.get("/:id", checkAuthenticated, async (req, res) => {
 
 //create an event
 router.post("/", checkAuthenticated, async (req, res) => {
-	const { issueIds, rules, ...eventData } = req.body;
+	const { issueIds, rules, coverImage, images, ...eventData } = req.body;
 	if (issueIds) {
 		if (issueIds.length === 0) {
 			return sendError(res, 400, "Please select atleast one issue");
@@ -105,6 +89,14 @@ router.post("/", checkAuthenticated, async (req, res) => {
 		return sendError(res, 400, "Please add atleast one rule");
 	}
 	eventData.creatorId = req.user.id;
+	if (coverImage) {
+		try {
+			const key = await s3PutBase64Image(coverImage);
+			eventData.picturepath = key;
+		} catch (e) {
+			return sendError(res, 400, e.message);
+		}
+	}
 	const cols = Object.keys(eventData);
 	const values = Object.values(eventData);
 	const eventQuery = format(
@@ -129,18 +121,37 @@ router.post("/", checkAuthenticated, async (req, res) => {
 			eventRulesArray,
 		);
 
-		const addressedIssuesPromise = pool.query(addressedIssuesQuery);
-		const eventRulesPromise = pool.query(eventRulesQuery);
+		const promises = [];
 
-		const result = await Promise.all([addressedIssuesPromise, eventRulesPromise]);
+		promises.push(pool.query(addressedIssuesQuery));
+		promises.push(pool.query(eventRulesQuery));
+
+		if (images && images.length > 0) {
+			const imagePromises = [];
+			images.forEach((image) => {
+				imagePromises.push(s3PutBase64Image(image));
+			});
+			const imageKeys = await Promise.all(imagePromises);
+
+			const imageKeysArray = imageKeys.map((key) => [eventId, key]);
+			const eventPicturesQuery = format(
+				"INSERT INTO eventPictures (eventid, picturepath) VALUES %L RETURNING *",
+				imageKeysArray,
+			);
+			promises.push(pool.query(eventPicturesQuery));
+		}
+
+		const result = await Promise.all(promises);
 
 		const addressedIssuesResult = result[0].rows;
 		const eventRulesResult = result[1].rows;
+		const eventPicturesResult = result[2] ? result[2].rows : [];
 
 		sendResponse(res, 201, {
 			...event,
 			addressedIssues: addressedIssuesResult,
-			eventRules: eventRulesResult,
+			rules: eventRulesResult,
+			pictures: eventPicturesResult,
 		});
 	} catch (e) {
 		sendError(res, 400, e.message);
@@ -154,6 +165,9 @@ router.patch(
 	async (req, res) => {
 		const { eventId, ...eventData } = req.body;
 		delete eventData.creatorId;
+		delete eventData.picturepath;
+		delete eventData.deletedAt;
+		delete eventData.createdAt;
 		if (!eventId) {
 			return sendError(res, 400, "Please provide an event id");
 		}
@@ -181,9 +195,53 @@ router.delete(
 	[checkAuthenticated, checkIsEventCreator],
 	async (req, res) => {
 		const { eventId } = req.params;
-		const query = `UPDATE events SET deletedAt = NOW() WHERE id = $1 AND deletedAt IS NULL`;
+		const getEventPicturepathQuery =
+			"SELECT picturepath from events where id = $1";
+		const getEventPicturesQuery =
+			"SELECT picturepath from eventpictures where eventid = $1";
+		const deleteQuery = `UPDATE events SET deletedAt = NOW(), picturepath = NULL WHERE id = $1 AND deletedAt IS NULL`;
+
+		const deleteEventPicturesQuery =
+			"DELETE FROM eventPictures WHERE eventid = $1";
+		const deleteEventRulesQuery = "DELETE FROM eventRules WHERE eventid = $1";
+		const deleteAddressedIssuesQuery =
+			"DELETE FROM addressedIssues WHERE eventid = $1";
+		const deleteEventParticipantsQuery = `DELETE FROM eventParticipants WHERE eventid = $1`;
+
 		try {
-			await pool.query(query, [eventId]);
+			const getEventPicturepathResult = await pool.query(
+				getEventPicturepathQuery,
+				[eventId],
+			);
+			const getEventPicturesResult = await pool.query(getEventPicturesQuery, [
+				eventId,
+			]);
+
+			const pictures = [];
+			const picturepath = getEventPicturepathResult.rows[0].picturepath;
+			if (picturepath) {
+				pictures.push(picturepath);
+			}
+
+			const eventPictures = getEventPicturesResult.rows.map(
+				(picture) => picture.picturepath,
+			);
+			if (eventPictures.length > 0) {
+				pictures.push(...eventPictures);
+			}
+
+			const promises = [];
+			for (let picture of pictures) {
+				promises.push(s3DeleteImage(picture));
+			}
+
+			promises.push(pool.query(deleteEventPicturesQuery, [eventId]));
+			promises.push(pool.query(deleteEventRulesQuery, [eventId]));
+			promises.push(pool.query(deleteAddressedIssuesQuery, [eventId]));
+			promises.push(pool.query(deleteEventParticipantsQuery, [eventId]));
+			promises.push(pool.query(deleteQuery, [eventId]));
+
+			await Promise.all(promises);
 			sendResponse(res, 200);
 		} catch (e) {
 			sendError(res, 400, e.message);

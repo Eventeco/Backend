@@ -1,5 +1,15 @@
+require("dotenv").config();
 const bcrypt = require("bcrypt");
 const pool = require("./dbPool");
+const s3Client = require("./config/S3");
+const {
+	PutObjectCommand,
+	GetObjectCommand,
+	DeleteObjectCommand,
+} = require("@aws-sdk/client-s3");
+const randomstring = require("randomstring");
+
+const BUCKET = process.env.AWS_BUCKET_NAME;
 
 const sendError = (res, status, message) => {
 	res.status(status).send({ success: false, message: message });
@@ -90,6 +100,77 @@ const isUserDeletedByUsername = async (username) => {
 	return user.deletedat ? true : false;
 };
 
+//put image in bucket
+const s3PutBase64Image = async (base64) => {
+	const buffer = Buffer.from(
+		base64.replace(/^data:image\/\w+;base64,/, ""),
+		"base64",
+	);
+	const extension = base64.substring(
+		"data:image/".length,
+		base64.indexOf(";base64"),
+	);
+	const key = `${randomstring.generate()}.${extension}`;
+	const uploadParams = {
+		Bucket: BUCKET,
+		Key: key,
+		Body: buffer,
+	};
+	const command = new PutObjectCommand(uploadParams);
+	await s3Client.send(command);
+	return key;
+};
+
+//get image from s3 bucket
+const s3GetImage = async (key) => {
+	const getParams = {
+		Bucket: BUCKET,
+		Key: key,
+	};
+	const command = new GetObjectCommand(getParams);
+	const response = await s3Client.send(command);
+	return response;
+};
+
+//delete image from s3 bucket
+const s3DeleteImage = async (key) => {
+	const deleteParams = {
+		Bucket: BUCKET,
+		Key: key,
+	};
+	const command = new DeleteObjectCommand(deleteParams);
+	const response = await s3Client.send(command);
+	return response;
+};
+
+const getEvents = (params) => {
+	const {
+		eventsFilteringQuery = "",
+		issuesFilteringQuery = "",
+		id,
+		suggested = false,
+	} = params;
+	const query = `SELECT e.*, json_agg(u) -> 0 AS user, 
+					COALESCE(json_agg(DISTINCT i) FILTER (WHERE i.id IS NOT NULL), '[]') AS issues, 
+					COALESCE(json_agg(DISTINCT jsonb_build_object('id', er.id, 'rule', er.rule)) FILTER (WHERE er.id IS NOT NULL), '[]') AS rules,
+					COALESCE(json_agg(DISTINCT ep) FILTER (WHERE ep.id IS NOT NULL), '[]') AS pictures 
+					FROM events AS e
+					JOIN users AS u ON e.creatorId = u.id AND e.deletedAt IS NULL ${
+						id && !suggested ? "AND e.id = $1" : ""
+					} ${eventsFilteringQuery}
+					LEFT JOIN eventRules AS er ON er.eventId = e.id
+					LEFT JOIN eventPictures AS ep ON ep.eventId = e.id
+					LEFT JOIN addressedIssues AS a ON a.eventId = e.id
+					JOIN issuetypes AS i ON a.issuetypeid = i.id
+					${issuesFilteringQuery}
+					GROUP BY e.id
+					ORDER BY e.createdAt DESC`;
+	if (id) {
+		return pool.query(query, [id]);
+	}
+	return pool.query(query);
+};
+
 module.exports = {
 	sendError,
 	sendResponse,
@@ -101,4 +182,8 @@ module.exports = {
 	checkUserHasNotJoinedEventOnSameDay,
 	verifyUserPassword,
 	isUserDeletedByUsername,
+	s3PutBase64Image,
+	s3GetImage,
+	s3DeleteImage,
+	getEvents,
 };

@@ -2,7 +2,7 @@ const express = require("express");
 const cors = require("cors");
 const morgan = require("morgan");
 const { getUserByUsername, getUserById } = require("./helper");
-const initializePassport = require("./passport-config");
+const initializePassport = require("./config/passport-config");
 const session = require("express-session");
 const passport = require("passport");
 
@@ -24,7 +24,7 @@ initializePassport(getUserByUsername, getUserById);
 
 //Middlewares
 app.use(cors({ origin: true }));
-app.use(express.json());
+app.use(express.json({ limit: "50mb" }));
 app.use(morgan("dev"));
 app.use(
 	session({
