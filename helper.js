@@ -156,7 +156,7 @@ const getEvents = (params) => {
 					COALESCE(json_agg(DISTINCT ep) FILTER (WHERE ep.id IS NOT NULL), '[]') AS pictures 
 					FROM events AS e
 					JOIN users AS u ON e.creatorId = u.id AND e.deletedAt IS NULL ${
-						id && !suggested ? "AND e.id = $1" : ""
+						id ? (!suggested ? "AND e.id = $1" : "AND e.id != $1") : ""
 					} ${eventsFilteringQuery}
 					LEFT JOIN eventRules AS er ON er.eventId = e.id
 					LEFT JOIN eventPictures AS ep ON ep.eventId = e.id

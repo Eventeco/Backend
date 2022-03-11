@@ -29,7 +29,7 @@ router.get("/uname/:username", async (req, res) => {
 });
 
 //get user by id
-router.get("/:userId", async (req, res) => {
+router.get("/:userId", checkAuthenticated, async (req, res) => {
 	const userId = req.params.userId;
 	try {
 		const result = await getUserById(userId);
@@ -43,8 +43,9 @@ router.get("/:userId", async (req, res) => {
 });
 
 //check if user has another event on same day
-router.get("/check-event/:userId/event/:eventId", async (req, res) => {
-	const { userId, eventId } = req.params;
+router.get("/check-event/:eventId", checkAuthenticated, async (req, res) => {
+	const { eventId } = req.params;
+	const userId = req.user.id;
 	try {
 		const result = await checkUserHasNotJoinedEventOnSameDay(eventId, userId);
 		if (result) {

@@ -37,6 +37,22 @@ router.get("/count/:eventId", checkAuthenticated, async (req, res) => {
 	}
 });
 
+router.get("/isParticipant/:eventId", checkAuthenticated, async (req, res) => {
+	const { eventId } = req.params;
+	const userId = req.user.id;
+	const query = `SELECT * FROM eventparticipants WHERE eventid = $1 AND userid = $2`;
+	try {
+		const result = await pool.query(query, [eventId, userId]);
+		if (result.rows.length > 0) {
+			sendResponse(res, 200, true);
+		} else {
+			sendResponse(res, 200, false);
+		}
+	} catch (e) {
+		sendError(res, 400, e.message);
+	}
+});
+
 //add participant to event by eventId and userId
 router.post(
 	"/",
