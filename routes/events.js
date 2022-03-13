@@ -149,9 +149,10 @@ router.post("/", checkAuthenticated, async (req, res) => {
 
 		sendResponse(res, 201, {
 			...event,
-			addressedIssues: addressedIssuesResult,
+			issues: addressedIssuesResult,
 			rules: eventRulesResult,
 			pictures: eventPicturesResult,
+			user: req.user,
 		});
 	} catch (e) {
 		sendError(res, 400, e.message);
