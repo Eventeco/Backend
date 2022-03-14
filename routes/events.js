@@ -113,17 +113,21 @@ router.post("/", checkAuthenticated, async (req, res) => {
 		const eventRulesArray = rules.map((rule) => [eventId, rule]);
 
 		const addressedIssuesQuery = format(
-			"INSERT INTO addressedIssues VALUES %L RETURNING *",
+			"INSERT INTO addressedIssues VALUES %L",
 			addressedIssuesArray,
 		);
 		const eventRulesQuery = format(
 			"INSERT INTO eventRules (eventid, rule) VALUES %L RETURNING *",
 			eventRulesArray,
 		);
+		const issueTypesQuery = format(
+			"SELECT * FROM issuetypes WHERE id IN (%L)",
+			issueIds,
+		);
 
 		const promises = [];
 
-		promises.push(pool.query(addressedIssuesQuery));
+		promises.push(pool.query(issueTypesQuery));
 		promises.push(pool.query(eventRulesQuery));
 
 		if (images && images.length > 0) {
@@ -141,15 +145,17 @@ router.post("/", checkAuthenticated, async (req, res) => {
 			promises.push(pool.query(eventPicturesQuery));
 		}
 
+		promises.push(pool.query(addressedIssuesQuery));
+
 		const result = await Promise.all(promises);
 
-		const addressedIssuesResult = result[0].rows;
+		const issueTypesResult = result[0].rows;
 		const eventRulesResult = result[1].rows;
 		const eventPicturesResult = result[2] ? result[2].rows : [];
 
 		sendResponse(res, 201, {
 			...event,
-			issues: addressedIssuesResult,
+			issues: issueTypesResult,
 			rules: eventRulesResult,
 			pictures: eventPicturesResult,
 			user: req.user,

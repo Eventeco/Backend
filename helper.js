@@ -102,14 +102,9 @@ const isUserDeletedByUsername = async (username) => {
 
 //put image in bucket
 const s3PutBase64Image = async (base64) => {
-	const buffer = Buffer.from(
-		base64.replace(/^data:image\/\w+;base64,/, ""),
-		"base64",
-	);
-	const extension = base64.substring(
-		"data:image/".length,
-		base64.indexOf(";base64"),
-	);
+	const buffer = Buffer.from(base64, "base64");
+	const extensions = { "/": "jpg", i: "png", R: "gif", U: "webp" };
+	const extension = extensions[base64.charAt(0)];
 	const key = `${randomstring.generate()}.${extension}`;
 	const uploadParams = {
 		Bucket: BUCKET,
