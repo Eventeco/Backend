@@ -26,7 +26,7 @@ router.get("/", checkAuthenticated, async (req, res) => {
 	const issuesFilteringQuery = issues
 		? format(
 				` WHERE EXISTS (SELECT id FROM issuetypes WHERE id in (%s) )`,
-				issues.split(",").map(Number),
+				issues.length > 0 ? issues.split(",").map(Number) : +issues,
 		  )
 		: "";
 	const eventsFilteringQuery = `${nameQuery}${descriptionQuery}${typeQuery}${isDonationEnabledQuery}`;

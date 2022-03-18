@@ -15,7 +15,7 @@ router.get(
 	[checkAuthenticated, checkIsEventCreator],
 	async (req, res) => {
 		const { eventId } = req.params;
-		const query = `SELECT * FROM eventparticipants WHERE eventid = $1`;
+		const query = `SELECT u.* FROM eventparticipants AS ep JOIN users AS u ON u.id = ep.userid AND ep.eventId = $1`;
 		try {
 			const result = await pool.query(query, [eventId]);
 			sendResponse(res, 200, result.rows);
