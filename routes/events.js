@@ -25,18 +25,27 @@ router.get("/", checkAuthenticated, async (req, res) => {
 
 	const issuesFilteringQuery = issues
 		? format(
-				` WHERE EXISTS (SELECT id FROM issuetypes WHERE id in (%s) )`,
+				`WHERE a.issuetypeid IN (%s)`,
 				issues.length > 0 ? issues.split(",").map(Number) : +issues,
 		  )
 		: "";
 	const eventsFilteringQuery = `${nameQuery}${descriptionQuery}${typeQuery}${isDonationEnabledQuery}`;
 
+	const query = `SELECT e.id
+					FROM events AS e
+					JOIN users AS u ON e.creatorId = u.id AND e.deletedAt IS NULL ${eventsFilteringQuery}
+					LEFT JOIN addressedIssues AS a ON a.eventId = e.id
+					JOIN issuetypes AS i ON a.issuetypeid = i.id
+					${issuesFilteringQuery}`;
+
 	try {
-		const result = await getEvents({
-			issuesFilteringQuery,
-			eventsFilteringQuery,
-		});
-		sendResponse(res, 200, result.rows);
+		const result = await pool.query(query);
+		if (result.rowCount === 0) {
+			return sendResponse(res, 200, []);
+		}
+		const ids = result.rows.map((row) => row.id);
+		const eventsResponse = await getEvents(ids);
+		sendResponse(res, 200, eventsResponse.rows);
 	} catch (e) {
 		sendError(res, 400, e.message);
 	}
@@ -45,20 +54,23 @@ router.get("/", checkAuthenticated, async (req, res) => {
 //get suggested events based on event issues
 router.get("/suggested/:id", checkAuthenticated, async (req, res) => {
 	const { id } = req.params;
-	const issuesFilteringQuery = ` WHERE EXISTS (
-		SELECT i.id 
-		FROM addressedIssues AS a 
-		JOIN issuetypes AS i 
-		ON a.issuetypeid = i.id 
-		WHERE a.eventId = $1)`;
+
+	const query = `SELECT DISTINCT e.id
+					FROM events AS e
+					JOIN users AS u ON e.creatorId = u.id AND e.deletedAt IS NULL AND e.id != $1
+					LEFT JOIN addressedIssues AS a ON a.eventId = e.id
+					JOIN issuetypes AS i ON a.issuetypeid = i.id AND i.id IN (
+						SELECT issuetypeid FROM addressedIssues WHERE eventId = $1
+					)`;
 
 	try {
-		const result = await getEvents({
-			issuesFilteringQuery,
-			id,
-			suggested: true,
-		});
-		sendResponse(res, 200, result.rows);
+		const result = await pool.query(query, [id]);
+		if (result.rowCount === 0) {
+			return sendResponse(res, 200, []);
+		}
+		const ids = result.rows.map((row) => row.id);
+		const eventsResponse = await getEvents(ids);
+		sendResponse(res, 200, eventsResponse.rows);
 	} catch (e) {
 		sendError(res, 400, e.message);
 	}
@@ -68,7 +80,7 @@ router.get("/suggested/:id", checkAuthenticated, async (req, res) => {
 router.get("/:id", checkAuthenticated, async (req, res) => {
 	const { id } = req.params;
 	try {
-		const result = await getEvents({ id });
+		const result = await getEvents(id);
 		sendResponse(res, 200, result.rows);
 	} catch (e) {
 		sendError(res, 400, e.message);

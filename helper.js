@@ -8,6 +8,7 @@ const {
 	DeleteObjectCommand,
 } = require("@aws-sdk/client-s3");
 const randomstring = require("randomstring");
+const format = require("pg-format");
 
 const BUCKET = process.env.AWS_BUCKET_NAME;
 
@@ -138,31 +139,27 @@ const s3DeleteImage = async (key) => {
 	return response;
 };
 
-const getEvents = (params) => {
-	const {
-		eventsFilteringQuery = "",
-		issuesFilteringQuery = "",
-		id,
-		suggested = false,
-	} = params;
-	const query = `SELECT e.*, json_agg(u) -> 0 AS user, 
-					COALESCE(json_agg(DISTINCT i) FILTER (WHERE i.id IS NOT NULL), '[]') AS issues, 
+const getEvents = (eventIds = []) => {
+	if (eventIds.length === 0) {
+		return [];
+	}
+	const query = format(
+		`SELECT e.*, json_agg(u) -> 0 AS user,
+					COALESCE(json_agg(DISTINCT i) FILTER (WHERE i.id IS NOT NULL), '[]') AS issues,
 					COALESCE(json_agg(DISTINCT jsonb_build_object('id', er.id, 'rule', er.rule)) FILTER (WHERE er.id IS NOT NULL), '[]') AS rules,
-					COALESCE(json_agg(DISTINCT ep) FILTER (WHERE ep.id IS NOT NULL), '[]') AS pictures 
+					COALESCE(json_agg(DISTINCT ep) FILTER (WHERE ep.id IS NOT NULL), '[]') AS pictures
 					FROM events AS e
-					JOIN users AS u ON e.creatorId = u.id AND e.deletedAt IS NULL ${
-						id ? (!suggested ? "AND e.id = $1" : "AND e.id != $1") : ""
-					} ${eventsFilteringQuery}
+					JOIN users AS u ON e.creatorId = u.id AND e.deletedAt IS NULL
 					LEFT JOIN eventRules AS er ON er.eventId = e.id
 					LEFT JOIN eventPictures AS ep ON ep.eventId = e.id
 					LEFT JOIN addressedIssues AS a ON a.eventId = e.id
 					JOIN issuetypes AS i ON a.issuetypeid = i.id
-					${issuesFilteringQuery}
+					WHERE e.id IN (%s)
 					GROUP BY e.id
-					ORDER BY e.createdAt DESC`;
-	if (id) {
-		return pool.query(query, [id]);
-	}
+					ORDER BY e.createdAt DESC`,
+		eventIds,
+	);
+
 	return pool.query(query);
 };
 
