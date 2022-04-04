@@ -21,7 +21,8 @@
     "randomstring": "^1.2.2"
   },
   "scripts": {
-    "start": "nodemon index.js"
+    "start": "node index.js",
+    "start:dev": "nodemon index.js"
   },
   "devDependencies": {
     "morgan": "^1.10.0",

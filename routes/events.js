@@ -171,6 +171,7 @@ router.post("/", checkAuthenticated, async (req, res) => {
 			rules: eventRulesResult,
 			pictures: eventPicturesResult,
 			user: req.user,
+			participantscount: 0,
 		});
 	} catch (e) {
 		sendError(res, 400, e.message);

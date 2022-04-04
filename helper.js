@@ -147,10 +147,12 @@ const getEvents = (eventIds = []) => {
 		`SELECT e.*, json_agg(u) -> 0 AS user,
 					COALESCE(json_agg(DISTINCT i) FILTER (WHERE i.id IS NOT NULL), '[]') AS issues,
 					COALESCE(json_agg(DISTINCT jsonb_build_object('id', er.id, 'rule', er.rule)) FILTER (WHERE er.id IS NOT NULL), '[]') AS rules,
-					COALESCE(json_agg(DISTINCT ep) FILTER (WHERE ep.id IS NOT NULL), '[]') AS pictures
+					COALESCE(json_agg(DISTINCT ep) FILTER (WHERE ep.id IS NOT NULL), '[]') AS pictures,
+					COUNT(DISTINCT evp.*) AS participantsCount
 					FROM events AS e
 					JOIN users AS u ON e.creatorId = u.id AND e.deletedAt IS NULL
 					LEFT JOIN eventRules AS er ON er.eventId = e.id
+					LEFT JOIN eventParticipants AS evp ON evp.eventId = e.id
 					LEFT JOIN eventPictures AS ep ON ep.eventId = e.id
 					LEFT JOIN addressedIssues AS a ON a.eventId = e.id
 					JOIN issuetypes AS i ON a.issuetypeid = i.id
