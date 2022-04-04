@@ -17,6 +17,7 @@ const eventRules = require("./routes/eventRules");
 const eventPictures = require("./routes/eventPictures");
 
 const PORT = process.env.PORT || "8080";
+const ENV = process.env.NODE_ENV || "development";
 
 const app = express();
 
@@ -25,7 +26,7 @@ initializePassport(getUserByUsername, getUserById);
 //Middlewares
 app.use(cors({ origin: true }));
 app.use(express.json({ limit: "50mb" }));
-app.use(morgan("dev"));
+app.use(morgan(ENV == "production" ? "tiny" : "dev"));
 app.use(
 	session({
 		secret: "HFY12YJyHAh78BzFAkRd9nMTRW0ZUEFm",
