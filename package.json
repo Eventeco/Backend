@@ -13,6 +13,7 @@
     "email-validator": "^2.0.4",
     "express": "^4.17.2",
     "express-session": "^1.17.2",
+    "geolocation-utils": "^1.2.5",
     "image-url-validator": "^1.0.4",
     "morgan": "^1.10.0",
     "passport": "^0.5.2",

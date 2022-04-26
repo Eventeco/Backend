@@ -9,12 +9,31 @@ const {
 const format = require("pg-format");
 const pool = require("../dbPool");
 const { checkAuthenticated, checkIsEventCreator } = require("../middlewares");
+const { insideCircle } = require("geolocation-utils");
 
 const router = express.Router();
 
-//get all events and filter events by name, description, type, isDonationEnabled
-router.get("/", checkAuthenticated, async (req, res) => {
-	const { name, description, type, isDonationEnabled, issues } = req.query;
+//get all events and filter events by name, description, type, isDonationEnabled, radius, lat, lng
+router.get("/", async (req, res) => {
+	const {
+		name,
+		description,
+		type,
+		isDonationEnabled,
+		issues,
+		latitude,
+		longitude,
+		radius,
+	} = req.query;
+
+	if ((latitude || longitude || radius) && !(latitude && longitude && radius)) {
+		return sendError(
+			res,
+			400,
+			"latitude, longitude and radius must be provided together",
+		);
+	}
+
 	const nameQuery = name ? format(` AND e.name ILIKE '%%%s%%'`, name) : "";
 	const descriptionQuery = description
 		? format(` AND e.description ILIKE '%%%s%%'`, description)
@@ -31,7 +50,7 @@ router.get("/", checkAuthenticated, async (req, res) => {
 		: "";
 	const eventsFilteringQuery = `${nameQuery}${descriptionQuery}${typeQuery}${isDonationEnabledQuery}`;
 
-	const query = `SELECT e.id
+	const query = `SELECT DISTINCT(e.id), e.latitude, e.longitude
 					FROM events AS e
 					JOIN users AS u ON e.creatorId = u.id AND e.deletedAt IS NULL ${eventsFilteringQuery}
 					LEFT JOIN addressedIssues AS a ON a.eventId = e.id
@@ -43,7 +62,20 @@ router.get("/", checkAuthenticated, async (req, res) => {
 		if (result.rowCount === 0) {
 			return sendResponse(res, 200, []);
 		}
-		const ids = result.rows.map((row) => row.id);
+		let selectedEvents = result.rows;
+		if (latitude && longitude && radius) {
+			selectedEvents = result.rows.filter((row) => {
+				const eventLocation = { lat: +row.latitude, lon: +row.longitude };
+				const center = { lat: +latitude, lon: +longitude };
+				if (insideCircle(eventLocation, center, +radius)) {
+					return row;
+				}
+			});
+			if (selectedEvents.length === 0) {
+				return sendResponse(res, 200, []);
+			}
+		}
+		const ids = selectedEvents.map((row) => row.id);
 		const eventsResponse = await getEvents(ids);
 		sendResponse(res, 200, eventsResponse.rows);
 	} catch (e) {
