@@ -9,6 +9,8 @@ const {
 	getUserById,
 	cryptPassword,
 	verifyUserPassword,
+	s3PutBase64Image,
+	s3DeleteImage,
 } = require("../helper");
 const { checkAuthenticated } = require("../middlewares");
 
@@ -85,10 +87,20 @@ router.patch("/change-password", checkAuthenticated, async (req, res) => {
 
 //change user details
 router.patch("/", checkAuthenticated, async (req, res) => {
-	const { password, ...dataToChange } = req.body;
+	const { password, base64, ...dataToChange } = req.body;
 	const userId = req.user.id;
 
 	delete dataToChange.password;
+
+	if (base64) {
+		const getCurrentPicQuery = "SELECT profilepicpath FROM users WHERE id=$1";
+		const result = await pool.query(getCurrentPicQuery, [userId]);
+		const currentPicPath = result.rows[0].profilepicpath;
+		const promises = [s3PutBase64Image(base64), s3DeleteImage(currentPicPath)];
+		const results = await Promise.all(promises);
+		const newPicPath = results[0];
+		dataToChange.profilepicpath = newPicPath;
+	}
 
 	const sets = Object.entries(dataToChange).map(([key, value]) =>
 		format("%s = %L", key, value),

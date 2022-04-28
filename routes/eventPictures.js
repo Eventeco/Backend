@@ -27,17 +27,6 @@ router.get("/:eventId", checkAuthenticated, async (req, res) => {
 	}
 });
 
-//get picture by key
-router.get("/key/:key", checkAuthenticated, async (req, res) => {
-	const { key } = req.params;
-	try {
-		const response = await s3GetImage(key);
-		response.Body.pipe(res);
-	} catch (e) {
-		sendError(res, 400, e.message);
-	}
-});
-
 //add new pictures to event
 router.post(
 	"/",
