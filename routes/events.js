@@ -27,11 +27,7 @@ router.get("/", async (req, res) => {
 	} = req.query;
 
 	if ((latitude || longitude || radius) && !(latitude && longitude && radius)) {
-		return sendError(
-			res,
-			400,
-			"latitude, longitude and radius must be provided together",
-		);
+		return sendError(res, 400, "location and radius must be provided together");
 	}
 
 	const nameQuery = name ? format(` AND e.name ILIKE '%%%s%%'`, name) : "";
