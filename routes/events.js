@@ -302,6 +302,3 @@ router.delete(
 );
 
 module.exports = router;
-
-// todo:
-// event geolocation filter with coordinates and radius
