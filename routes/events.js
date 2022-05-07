@@ -249,9 +249,9 @@ router.patch(
 	"/",
 	[checkAuthenticated, checkIsEventCreator],
 	async (req, res) => {
-		const { eventId, ...eventData } = req.body;
+		const { eventId, issueIds, images, rules, coverPhoto, ...eventData } =
+			req.body;
 		delete eventData.creatorId;
-		delete eventData.picturepath;
 		delete eventData.deletedAt;
 		delete eventData.createdAt;
 		if (!eventId) {
@@ -267,8 +267,10 @@ router.patch(
 			eventId,
 		);
 		try {
-			const result = await pool.query(query);
-			sendResponse(res, 200, result.rows[0]);
+			await pool.query(query);
+			const eventResult = await getEvents([eventId]);
+			const event = eventResult.rows[0];
+			sendResponse(res, 200, event);
 		} catch (e) {
 			sendError(res, 400, e.message);
 		}

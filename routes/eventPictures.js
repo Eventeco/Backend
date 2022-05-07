@@ -3,7 +3,6 @@ const {
 	sendResponse,
 	sendError,
 	s3PutBase64Image,
-	s3GetImage,
 	s3DeleteImage,
 } = require("../helper");
 const pool = require("../dbPool");
