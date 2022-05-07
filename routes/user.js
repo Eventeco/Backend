@@ -4,13 +4,12 @@ const pool = require("../dbPool");
 const {
 	sendError,
 	sendResponse,
-	getUserByUsername,
 	checkUserHasNotJoinedEventOnSameDay,
-	getUserById,
 	cryptPassword,
 	verifyUserPassword,
 	s3PutBase64Image,
 	s3DeleteImage,
+	getUsers,
 } = require("../helper");
 const { checkAuthenticated } = require("../middlewares");
 
@@ -20,25 +19,35 @@ const router = express.Router();
 router.get("/uname/:username", async (req, res) => {
 	const username = req.params.username;
 	try {
-		const result = await getUserByUsername(username);
-		if (result.deletedat) {
-			return sendError(res, 404, "User is deleted");
+		const query = "SELECT * FROM users WHERE username = $1 AND isadmin = false";
+		const result = await pool.query(query, [username]);
+		if (result.rows.length === 0) {
+			return sendError(res, 404, "User not found");
 		}
-		sendResponse(res, 200, result);
+		const userResult = await getUsers([result.rows[0].id]);
+		const user = userResult.rows[0];
+		if (user.deletedat) {
+			return sendError(res, 400, "User is deleted");
+		}
+		sendResponse(res, 200, user);
 	} catch (e) {
 		sendError(res, 400, e.message);
 	}
 });
 
 //get user by id
-router.get("/:userId", checkAuthenticated, async (req, res) => {
+router.get("/:userId", async (req, res) => {
 	const userId = req.params.userId;
 	try {
-		const result = await getUserById(userId);
-		if (result.deletedat) {
-			return sendError(res, 404, "User is deleted");
+		const userResult = await getUsers([userId]);
+		if (userResult.rows.length === 0) {
+			return sendError(res, 404, "User not found");
 		}
-		sendResponse(res, 200, result);
+		const user = userResult.rows[0];
+		if (user.deletedat) {
+			return sendError(res, 400, "User is deleted");
+		}
+		sendResponse(res, 200, userResult.rows[0]);
 	} catch (e) {
 		sendError(res, 400, e.message);
 	}
@@ -91,6 +100,7 @@ router.patch("/", checkAuthenticated, async (req, res) => {
 	const userId = req.user.id;
 
 	delete dataToChange.password;
+	delete dataToChange.isadmin;
 
 	if (base64) {
 		const getCurrentPicQuery = "SELECT profilepicpath FROM users WHERE id=$1";

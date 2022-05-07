@@ -101,6 +101,11 @@ const isUserDeletedByUsername = async (username) => {
 	return user.deletedat ? true : false;
 };
 
+const isUserAdminByUsername = async (username) => {
+	const user = await getUserByUsername(username);
+	return user.isadmin ? true : false;
+};
+
 //put image in bucket
 const s3PutBase64Image = async (base64) => {
 	const buffer = Buffer.from(base64, "base64");
@@ -165,6 +170,22 @@ const getEvents = (eventIds = []) => {
 	return pool.query(query);
 };
 
+const getUsers = (userIds = []) => {
+	if (userIds.length === 0) {
+		return [];
+	}
+	const query = format(
+		`SELECT u.*,
+		COUNT(DISTINCT e.id) AS eventsCount 
+		FROM users AS u
+		LEFT JOIN events AS e ON e.creatorId = u.id AND e.deletedAt IS NULL
+		WHERE u.id IN (%s)
+		GROUP BY u.id`,
+		userIds,
+	);
+	return pool.query(query);
+};
+
 module.exports = {
 	sendError,
 	sendResponse,
@@ -180,4 +201,6 @@ module.exports = {
 	s3GetImage,
 	s3DeleteImage,
 	getEvents,
+	getUsers,
+	isUserAdminByUsername,
 };

@@ -1,5 +1,12 @@
 const { sendError, getEventCreator } = require("./helper");
 
+const checkAdmin = (req, res, next) => {
+	if (req.isAuthenticated() && req.user.isadmin) {
+		return next();
+	}
+	return sendError(res, 401, "unauthenticated or not admin");
+};
+
 const checkAuthenticated = (req, res, next) => {
 	if (req.isAuthenticated()) {
 		return next();
@@ -15,6 +22,7 @@ const checkNotAuthenticated = (req, res, next) => {
 };
 
 const checkIsEventCreator = async (req, res, next) => {
+	if (req.user.isadmin) return next();
 	const eventId = req.body.eventId || req.params.eventId;
 	if (!eventId) {
 		return sendError(res, 400, "eventId is required");
@@ -32,6 +40,7 @@ const checkIsEventCreator = async (req, res, next) => {
 };
 
 const checkIsNotEventCreator = async (req, res, next) => {
+	if (req.user.isadmin) return next();
 	const eventId = req.body.eventId || req.params.eventId;
 	if (!eventId) {
 		return sendError(res, 400, "eventId is required");
@@ -53,4 +62,5 @@ module.exports = {
 	checkNotAuthenticated,
 	checkIsEventCreator,
 	checkIsNotEventCreator,
+	checkAdmin,
 };

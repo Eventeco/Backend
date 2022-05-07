@@ -14,7 +14,7 @@ const { insideCircle } = require("geolocation-utils");
 const router = express.Router();
 
 //get all events and filter events by name, description, type, isDonationEnabled, radius, lat, lng
-router.get("/", async (req, res) => {
+router.get("/", checkAuthenticated, async (req, res) => {
 	const {
 		name,
 		description,
@@ -104,12 +104,51 @@ router.get("/suggested/:id", checkAuthenticated, async (req, res) => {
 	}
 });
 
+//Get upcoming events
+router.get("/upcoming", checkAuthenticated, async (_, res) => {
+	const query = `SELECT id
+					FROM events
+					WHERE starttime > NOW() AND deletedAt IS NULL`;
+
+	try {
+		const result = await pool.query(query);
+		if (result.rowCount === 0) {
+			return sendResponse(res, 200, []);
+		}
+		const ids = result.rows.map((row) => row.id);
+		console.log(ids);
+		const eventsResponse = await getEvents(ids);
+		sendResponse(res, 200, eventsResponse.rows);
+	} catch (e) {
+		sendError(res, 400, e.message);
+	}
+});
+
+//Get past events
+router.get("/completed", checkAuthenticated, async (_, res) => {
+	const query = `SELECT id
+					FROM events
+					WHERE endtime < NOW() AND deletedAt IS NULL`;
+
+	try {
+		const result = await pool.query(query);
+		if (result.rowCount === 0) {
+			return sendResponse(res, 200, []);
+		}
+		const ids = result.rows.map((row) => row.id);
+		const eventsResponse = await getEvents(ids);
+		sendResponse(res, 200, eventsResponse.rows);
+	} catch (e) {
+		sendError(res, 400, e.message);
+	}
+});
+
 //get event by id
 router.get("/:id", checkAuthenticated, async (req, res) => {
 	const { id } = req.params;
 	try {
 		const result = await getEvents(id);
-		sendResponse(res, 200, result.rows);
+		sendResponse(res, 200, result.rows[0]);
 	} catch (e) {
 		sendError(res, 400, e.message);
 	}

@@ -38,7 +38,7 @@ router.post("/register", checkNotAuthenticated, async (req, res) => {
 	try {
 		const hashedPassword = await cryptPassword(password);
 		const result = await pool.query(
-			"INSERT INTO users (firstname, username, email, password) VALUES ($1, $2, $3, $4) RETURNING *",
+			"INSERT INTO users (firstname, username, email, password, isAdmin) VALUES ($1, $2, $3, $4, false) RETURNING *",
 			[name, username, email, hashedPassword],
 		);
 		sendResponse(res, 201, { user: result.rows[0] });
