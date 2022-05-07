@@ -80,7 +80,6 @@ router.patch("/change-password", checkAuthenticated, async (req, res) => {
 		return sendError(res, 400, "No old password provided");
 	}
 	const isOldPasswordCorrect = await verifyUserPassword(userId, oldPassword);
-	console.log(isOldPasswordCorrect);
 	if (!isOldPasswordCorrect) {
 		return sendError(res, 400, "The old password is incorrect");
 	}
@@ -101,6 +100,8 @@ router.patch("/", checkAuthenticated, async (req, res) => {
 
 	delete dataToChange.password;
 	delete dataToChange.isadmin;
+	delete dataToChange.deletedAt;
+	delete dataToChange.createdAt;
 
 	if (base64) {
 		const getCurrentPicQuery = "SELECT profilepicpath FROM users WHERE id=$1";

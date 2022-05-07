@@ -116,7 +116,6 @@ router.get("/upcoming", checkAuthenticated, async (_, res) => {
 			return sendResponse(res, 200, []);
 		}
 		const ids = result.rows.map((row) => row.id);
-		console.log(ids);
 		const eventsResponse = await getEvents(ids);
 		sendResponse(res, 200, eventsResponse.rows);
 	} catch (e) {

@@ -27,7 +27,7 @@ router.get("/allCounts", checkAdmin, async (_, res) => {
 	}
 });
 
-router.get("/activeUsers", async (_, res) => {
+router.get("/activeUsers", checkAdmin, async (_, res) => {
 	const query = `SELECT * FROM users WHERE deletedAt IS NULL AND isAdmin = false`;
 	try {
 		const result = await pool.query(query);
