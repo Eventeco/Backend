@@ -16,7 +16,9 @@ const issueTypesRoutes = require("./routes/issueTypes");
 const eventRules = require("./routes/eventRules");
 const eventPictures = require("./routes/eventPictures");
 const s3 = require("./routes/s3");
-const admin = require("./routes/adminRoutes");
+const admin = require("./routes/admin");
+const userRatings = require("./routes/userRatings");
+const eventFeedbacks = require("./routes/eventFeedbacks");
 
 const PORT = process.env.PORT || "8080";
 const ENV = process.env.NODE_ENV || "development";
@@ -51,6 +53,8 @@ app.use("/eventRules", eventRules);
 app.use("/eventPictures", eventPictures);
 app.use("/s3", s3);
 app.use("/admin", admin);
+app.use("/userRatings", userRatings);
+app.use("/eventFeedbacks", eventFeedbacks);
 
 app.listen(PORT, () => {
 	console.log(`server started on port ${PORT}`);

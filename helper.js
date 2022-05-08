@@ -96,8 +96,23 @@ const verifyUserPassword = async (userId, password) => {
 	return await comparePasswords(password, user.password);
 };
 
+const doesUserExistByUsername = async (username) => {
+	const user = await getUserByUsername(username);
+	return user ? true : false;
+};
+
+const doesUserExistById = async (id) => {
+	const user = await getUserById(id);
+	return user ? true : false;
+};
+
 const isUserDeletedByUsername = async (username) => {
 	const user = await getUserByUsername(username);
+	return user.deletedat ? true : false;
+};
+
+const isUserDeletedById = async (id) => {
+	const user = await getUserById(id);
 	return user.deletedat ? true : false;
 };
 
@@ -153,13 +168,15 @@ const getEvents = (eventIds = []) => {
 					COALESCE(json_agg(DISTINCT i) FILTER (WHERE i.id IS NOT NULL), '[]') AS issues,
 					COALESCE(json_agg(DISTINCT jsonb_build_object('id', er.id, 'rule', er.rule)) FILTER (WHERE er.id IS NOT NULL), '[]') AS rules,
 					COALESCE(json_agg(DISTINCT ep) FILTER (WHERE ep.id IS NOT NULL), '[]') AS pictures,
-					COUNT(DISTINCT evp.*) AS participantsCount
+					COUNT(DISTINCT evp.*) AS participantsCount,
+					ROUND(AVG(f.rating), 2) AS averageRating
 					FROM events AS e
 					JOIN users AS u ON e.creatorId = u.id AND e.deletedAt IS NULL
 					LEFT JOIN eventRules AS er ON er.eventId = e.id
 					LEFT JOIN eventParticipants AS evp ON evp.eventId = e.id
 					LEFT JOIN eventPictures AS ep ON ep.eventId = e.id
 					LEFT JOIN addressedIssues AS a ON a.eventId = e.id
+					LEFT JOIN eventfeedbackresponses AS f ON f.eventId = e.id
 					JOIN issuetypes AS i ON a.issuetypeid = i.id
 					WHERE e.id IN (%s)
 					GROUP BY e.id
@@ -176,9 +193,11 @@ const getUsers = (userIds = []) => {
 	}
 	const query = format(
 		`SELECT u.*,
-		COUNT(DISTINCT e.id) AS eventsCount 
+		COUNT(DISTINCT e.id) AS eventsCount,
+		ROUND(AVG(r.rating),2) AS averageRating
 		FROM users AS u
 		LEFT JOIN events AS e ON e.creatorId = u.id AND e.deletedAt IS NULL
+		LEFT JOIN userratings AS r ON r.ratedUser = u.id
 		WHERE u.id IN (%s)
 		GROUP BY u.id`,
 		userIds,
@@ -203,4 +222,7 @@ module.exports = {
 	getEvents,
 	getUsers,
 	isUserAdminByUsername,
+	isUserDeletedById,
+	doesUserExistByUsername,
+	doesUserExistById,
 };
