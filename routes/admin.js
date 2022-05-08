@@ -7,6 +7,7 @@ const {
 	getUsers,
 	isUserDeletedByUsername,
 	isUserAdminByUsername,
+	doesUserExistByUsername,
 } = require("../helper");
 const { checkAdmin, checkNotAuthenticated } = require("../middlewares");
 
@@ -40,14 +41,15 @@ router.get("/activeUsers", checkAdmin, async (_, res) => {
 });
 
 router.post("/login", checkNotAuthenticated, async (req, res, next) => {
+	const doesUserExist = await doesUserExistByUsername(req.body.username);
+	if (!doesUserExist) return sendError(res, 400, "User does not exist");
+
 	const isUserDeleted = await isUserDeletedByUsername(req.body.username);
-	if (isUserDeleted) {
-		return sendError(res, 400, "User is deleted");
-	}
+	if (isUserDeleted) return sendError(res, 400, "User is deleted");
+
 	const isUserAdmin = await isUserAdminByUsername(req.body.username);
-	if (!isUserAdmin) {
-		return sendError(res, 400, "User is not an admin");
-	}
+	if (!isUserAdmin) return sendError(res, 400, "User is not an admin");
+
 	passport.authenticate("local", function (err, user, info) {
 		if (err) return sendError(res, 500);
 		if (!user) return sendError(res, 400, info.message);
