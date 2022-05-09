@@ -5,11 +5,15 @@ const {
 	getEvents,
 	s3PutBase64Image,
 	s3DeleteImage,
+	filterQueries,
+	eventsInLocation,
+	eventsFilteringStatus,
+	isDifferent,
+	findDifference,
 } = require("../helper");
 const format = require("pg-format");
 const pool = require("../dbPool");
 const { checkAuthenticated, checkIsEventCreator } = require("../middlewares");
-const { insideCircle } = require("geolocation-utils");
 
 const router = express.Router();
 
@@ -24,27 +28,34 @@ router.get("/", checkAuthenticated, async (req, res) => {
 		latitude,
 		longitude,
 		radius,
+		status = eventsFilteringStatus.ALL,
 	} = req.query;
 
 	if ((latitude || longitude || radius) && !(latitude && longitude && radius)) {
 		return sendError(res, 400, "location and radius must be provided together");
 	}
 
-	const nameQuery = name ? format(` AND e.name ILIKE '%%%s%%'`, name) : "";
-	const descriptionQuery = description
-		? format(` AND e.description ILIKE '%%%s%%'`, description)
-		: "";
-	const typeQuery = type ? format(` AND e.type = %L`, type) : "";
-	const isDonationEnabledQuery =
-		isDonationEnabled === "true" ? ` AND e.isDonationEnabled = true` : "";
+	const allStatuses = [
+		eventsFilteringStatus.ALL,
+		eventsFilteringStatus.COMPLETED,
+		eventsFilteringStatus.UPCOMING,
+	];
+	if (status && !allStatuses.includes(status)) {
+		return sendError(
+			res,
+			400,
+			"status must be one of: " + allStatuses.join(", "),
+		);
+	}
 
-	const issuesFilteringQuery = issues
-		? format(
-				`WHERE a.issuetypeid IN (%s)`,
-				issues.length > 0 ? issues.split(",").map(Number) : +issues,
-		  )
-		: "";
-	const eventsFilteringQuery = `${nameQuery}${descriptionQuery}${typeQuery}${isDonationEnabledQuery}`;
+	const { issuesFilteringQuery, eventsFilteringQuery } = filterQueries({
+		name,
+		description,
+		type,
+		isDonationEnabled,
+		issues,
+		status,
+	});
 
 	const query = `SELECT DISTINCT(e.id), e.latitude, e.longitude
 					FROM events AS e
@@ -60,12 +71,10 @@ router.get("/", checkAuthenticated, async (req, res) => {
 		}
 		let selectedEvents = result.rows;
 		if (latitude && longitude && radius) {
-			selectedEvents = result.rows.filter((row) => {
-				const eventLocation = { lat: +row.latitude, lon: +row.longitude };
-				const center = { lat: +latitude, lon: +longitude };
-				if (insideCircle(eventLocation, center, +radius)) {
-					return row;
-				}
+			selectedEvents = eventsInLocation(result.rows, {
+				latitude,
+				longitude,
+				radius,
 			});
 			if (selectedEvents.length === 0) {
 				return sendResponse(res, 200, []);
@@ -93,44 +102,6 @@ router.get("/suggested/:id", checkAuthenticated, async (req, res) => {
 
 	try {
 		const result = await pool.query(query, [id]);
-		if (result.rowCount === 0) {
-			return sendResponse(res, 200, []);
-		}
-		const ids = result.rows.map((row) => row.id);
-		const eventsResponse = await getEvents(ids);
-		sendResponse(res, 200, eventsResponse.rows);
-	} catch (e) {
-		sendError(res, 400, e.message);
-	}
-});
-
-//Get upcoming events
-router.get("/upcoming", checkAuthenticated, async (_, res) => {
-	const query = `SELECT id
-					FROM events
-					WHERE starttime > NOW() AND deletedAt IS NULL`;
-
-	try {
-		const result = await pool.query(query);
-		if (result.rowCount === 0) {
-			return sendResponse(res, 200, []);
-		}
-		const ids = result.rows.map((row) => row.id);
-		const eventsResponse = await getEvents(ids);
-		sendResponse(res, 200, eventsResponse.rows);
-	} catch (e) {
-		sendError(res, 400, e.message);
-	}
-});
-
-//Get past events
-router.get("/completed", checkAuthenticated, async (_, res) => {
-	const query = `SELECT id
-					FROM events
-					WHERE endtime < NOW() AND deletedAt IS NULL`;
-
-	try {
-		const result = await pool.query(query);
 		if (result.rowCount === 0) {
 			return sendResponse(res, 200, []);
 		}
@@ -266,8 +237,85 @@ router.patch(
 			sets.join(", "),
 			eventId,
 		);
+
+		const getInformationQuery = `SELECT e.picturepath AS current_cover,
+		COALESCE(json_agg(DISTINCT i.id) FILTER (WHERE i.id IS NOT NULL), '[]') AS current_issues,
+		COALESCE(json_agg(DISTINCT er.rule) FILTER (WHERE er.id IS NOT NULL), '[]') AS current_rules,
+		COALESCE(json_agg(DISTINCT ep.picturepath) FILTER (WHERE ep.id IS NOT NULL), '[]') AS current_pictures
+		FROM events e
+		LEFT JOIN addressedIssues a ON e.id = a.eventid
+		LEFT JOIN issuetypes i ON a.issuetypeid = i.id
+		LEFT JOIN eventRules er ON e.id = er.eventid
+		LEFT JOIN eventPictures ep ON e.id = ep.eventid
+		WHERE e.id = $1
+		GROUP BY e.picturepath`;
+
 		try {
 			await pool.query(query);
+			const informationResult = await pool.query(getInformationQuery, [eventId]);
+			const information = informationResult.rows[0];
+			const { current_cover, current_issues, current_rules, current_pictures } =
+				information;
+
+			if (coverPhoto) {
+				const imagePromise = [];
+				imagePromise.push(s3PutBase64Image(coverPhoto));
+				imagePromise.push(s3DeleteImage(current_cover));
+				const imageKey = await Promise.all(imagePromise);
+				const updateCoverQuery = "UPDATE events SET picturepath = $2 WHERE id = $1";
+				await pool.query(updateCoverQuery, [eventId, imageKey[0]]);
+			}
+			if (isDifferent(current_issues, issueIds)) {
+				const addressedIssuesDeleteQuery =
+					"DELETE FROM addressedIssues WHERE eventid = $1";
+				const addressedIssuesInsertQuery = format(
+					"INSERT INTO addressedIssues (eventid, issuetypeid) VALUES %L RETURNING *",
+					issueIds.map((issueId) => [eventId, issueId]),
+				);
+				await pool.query(addressedIssuesDeleteQuery, [eventId]);
+				await pool.query(addressedIssuesInsertQuery);
+			}
+
+			if (isDifferent(current_rules, rules)) {
+				const eventRulesDeleteQuery = "DELETE FROM eventRules WHERE eventid = $1";
+				const eventRulesInsertQuery = format(
+					"INSERT INTO eventRules (eventid, rule) VALUES %L RETURNING *",
+					rules.map((rule) => [eventId, rule]),
+				);
+				await pool.query(eventRulesDeleteQuery, [eventId]);
+				await pool.query(eventRulesInsertQuery);
+			}
+
+			if (isDifferent(current_pictures, images)) {
+				const addedImages = findDifference(images, current_pictures);
+				if (addedImages.length > 0) {
+					const imagePromises = [];
+					addedImages.forEach((image) => {
+						imagePromises.push(s3PutBase64Image(image));
+					});
+					const imageKeys = await Promise.all(imagePromises);
+					const imageKeysArray = imageKeys.map((key) => [eventId, key]);
+					const eventPicturesInsertQuery = format(
+						"INSERT INTO eventPictures (eventid, picturepath) VALUES %L RETURNING *",
+						imageKeysArray,
+					);
+					await pool.query(eventPicturesInsertQuery);
+				}
+				const removedImages = findDifference(current_pictures, images);
+				if (removedImages.length > 0) {
+					const eventPicturesDeleteQuery = format(
+						"DELETE FROM eventPictures WHERE eventid = %s AND picturepath IN (%L)",
+						eventId,
+						removedImages,
+					);
+					const imagePromises = [];
+					removedImages.forEach((image) => {
+						imagePromises.push(s3DeleteImage(image));
+					});
+					await Promise.all(imagePromises);
+					await pool.query(eventPicturesDeleteQuery);
+				}
+			}
 			const eventResult = await getEvents([eventId]);
 			const event = eventResult.rows[0];
 			sendResponse(res, 200, event);
