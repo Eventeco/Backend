@@ -28,7 +28,9 @@ const app = express();
 initializePassport(getUserByUsername, getUserById);
 
 //Middlewares
-app.use(cors({ origin: true, credentials: true }));
+app.use(
+	cors({ origin: true, credentials: true, exposedHeaders: ["set-cookie"] }),
+);
 app.use(express.json({ limit: "50mb" }));
 app.use(morgan(ENV == "production" ? "tiny" : "dev"));
 app.use(
