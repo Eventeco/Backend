@@ -60,10 +60,24 @@ router.post(
 	async (req, res) => {
 		const { eventId } = req.body;
 		const userId = req.user.id;
+		const getMaxParticipantQuery = `SELECT maxparticipants FROM events WHERE id = $1`;
+		const getCurrentParticipantsQuery = `SELECT COUNT(*) AS count FROM eventparticipants WHERE eventid = $1`;
 		const query = `INSERT INTO eventparticipants (eventid, userId) VALUES ($1, $2)`;
 		try {
-			await pool.query(query, [eventId, userId]);
-			sendResponse(res, 200);
+			const maxparticipantsPromise = pool.query(getMaxParticipantQuery, [eventId]);
+			const currentParticipantsPromise = pool.query(getCurrentParticipantsQuery, [
+				eventId,
+			]);
+			const queriesPromises = [maxparticipantsPromise, currentParticipantsPromise];
+			const results = await Promise.all(queriesPromises);
+			const maxParticipants = +results[0].rows[0].maxparticipants;
+			const currentParticipants = +results[1].rows[0].count;
+			if (currentParticipants < maxParticipants) {
+				await pool.query(query, [eventId, userId]);
+				return sendResponse(res, 201);
+			} else {
+				return sendError(res, 400, "Max participants reached!");
+			}
 		} catch (e) {
 			sendError(res, 400, e.message);
 		}

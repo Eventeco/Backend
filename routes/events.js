@@ -94,7 +94,7 @@ router.get("/suggested/:id", checkAuthenticated, async (req, res) => {
 
 	const query = `SELECT DISTINCT e.id
 					FROM events AS e
-					JOIN users AS u ON e.creatorId = u.id AND e.deletedAt IS NULL AND e.id != $1
+					JOIN users AS u ON e.creatorId = u.id AND e.deletedAt IS NULL AND e.id != $1 AND e.starttime > NOW()
 					LEFT JOIN addressedIssues AS a ON a.eventId = e.id
 					JOIN issuetypes AS i ON a.issuetypeid = i.id AND i.id IN (
 						SELECT issuetypeid FROM addressedIssues WHERE eventId = $1
