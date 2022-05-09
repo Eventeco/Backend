@@ -39,9 +39,9 @@ app.use(
 		resave: false,
 		saveUninitialized: false,
 		cookie: {
-			sameSite: "none",
-			secure: "true",
+			secure: ENV == "production",
 		},
+		name: "eventeco-session",
 	}),
 );
 app.use(passport.initialize());
