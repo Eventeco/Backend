@@ -38,10 +38,6 @@ app.use(
 		secret: "HFY12YJyHAh78BzFAkRd9nMTRW0ZUEFm",
 		resave: false,
 		saveUninitialized: false,
-		cookie: {
-			secure: ENV == "production",
-		},
-		name: "eventeco-session",
 	}),
 );
 app.use(passport.initialize());
