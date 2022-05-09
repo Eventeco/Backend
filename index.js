@@ -38,6 +38,9 @@ app.use(
 		secret: "HFY12YJyHAh78BzFAkRd9nMTRW0ZUEFm",
 		resave: false,
 		saveUninitialized: false,
+		cookie: {
+			sameSite: "none",
+		},
 	}),
 );
 app.use(passport.initialize());
