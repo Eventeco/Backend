@@ -15,7 +15,7 @@ const router = express.Router();
 
 router.get("/allCounts", checkAdmin, async (_, res) => {
 	const query = `SELECT 
-                    (SELECT COUNT(*) FROM users WHERE deletedAt IS NULL) AS usersCount,
+                    (SELECT COUNT(*) FROM users WHERE deletedAt IS NULL AND isAdmin = FALSE) AS usersCount,
                     (SELECT COUNT(*) FROM events WHERE deletedAt IS NULL) AS eventsCount,
                     (SELECT COUNT(*) FROM events WHERE deletedAt IS NULL AND events.endtime > NOW()) AS upcomingEventsCount,
                     (SELECT COUNT(*) FROM events WHERE deletedAt IS NULL AND events.endtime < NOW()) AS pastEventsCount`;

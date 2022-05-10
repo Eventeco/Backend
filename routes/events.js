@@ -10,6 +10,7 @@ const {
 	eventsFilteringStatus,
 	isDifferent,
 	findDifference,
+	sortEventsByUserLocation,
 } = require("../helper");
 const format = require("pg-format");
 const pool = require("../dbPool");
@@ -29,6 +30,8 @@ router.get("/", checkAuthenticated, async (req, res) => {
 		longitude,
 		radius,
 		status = eventsFilteringStatus.ALL,
+		userLatitude,
+		userLongitude,
 	} = req.query;
 
 	if ((latitude || longitude || radius) && !(latitude && longitude && radius)) {
@@ -82,7 +85,12 @@ router.get("/", checkAuthenticated, async (req, res) => {
 		}
 		const ids = selectedEvents.map((row) => row.id);
 		const eventsResponse = await getEvents(ids);
-		sendResponse(res, 200, eventsResponse.rows);
+		let events = eventsResponse.rows;
+		if (userLatitude && userLongitude) {
+			const userLocation = { lat: +userLatitude, lon: +userLongitude };
+			events = sortEventsByUserLocation(userLocation, events);
+		}
+		sendResponse(res, 200, events);
 	} catch (e) {
 		sendError(res, 400, e.message);
 	}

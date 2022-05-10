@@ -1,4 +1,4 @@
-const { insideCircle } = require("geolocation-utils");
+const { insideCircle, distanceTo } = require("geolocation-utils");
 const format = require("pg-format");
 const pool = require("../dbPool");
 
@@ -85,10 +85,25 @@ const eventsInLocation = (events, { latitude, longitude, radius }) => {
 	});
 };
 
+const sortEventsByUserLocation = (userLocation, events) => {
+	return events.sort((a, b) => {
+		const aDistance = distanceTo(
+			{ lat: +a.latitude, lon: +a.longitude },
+			userLocation,
+		);
+		const bDistance = distanceTo(
+			{ lat: +b.latitude, lon: +b.longitude },
+			userLocation,
+		);
+		return aDistance - bDistance;
+	});
+};
+
 module.exports = {
 	eventsFilteringStatus,
 	getEvent,
 	getEvents,
 	filterQueries,
 	eventsInLocation,
+	sortEventsByUserLocation,
 };
