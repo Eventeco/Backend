@@ -125,7 +125,7 @@ router.get("/:id", checkAuthenticated, async (req, res) => {
 });
 
 //create an event
-router.post("/", async (req, res) => {
+router.post("/", checkAuthenticated, async (req, res) => {
 	const { issueIds, rules, coverImage, images, ...eventData } = req.body;
 	if (issueIds) {
 		if (issueIds.length === 0) {
@@ -137,10 +137,14 @@ router.post("/", async (req, res) => {
 	if (rules && rules.length === 0) {
 		return sendError(res, 400, "Please add atleast one rule");
 	}
-	eventData.creatorId = 25;
+	eventData.creatorId = req.user.id;
 	if (coverImage) {
-		const key = await s3PutBase64Image(coverImage);
-		eventData.picturepath = key;
+		try {
+			const key = await s3PutBase64Image(coverImage);
+			eventData.picturepath = key;
+		} catch (e) {
+			return sendError(res, 400, e.message);
+		}
 	}
 	const cols = Object.keys(eventData);
 	const values = Object.values(eventData);
@@ -149,62 +153,66 @@ router.post("/", async (req, res) => {
 		cols,
 		values,
 	);
-	const eventResult = await pool.query(eventQuery);
-	const event = eventResult.rows[0];
-	const eventId = event.id;
+	try {
+		const eventResult = await pool.query(eventQuery);
+		const event = eventResult.rows[0];
+		const eventId = event.id;
 
-	const addressedIssuesArray = issueIds.map((issueId) => [eventId, issueId]);
-	const eventRulesArray = rules.map((rule) => [eventId, rule]);
+		const addressedIssuesArray = issueIds.map((issueId) => [eventId, issueId]);
+		const eventRulesArray = rules.map((rule) => [eventId, rule]);
 
-	const addressedIssuesQuery = format(
-		"INSERT INTO addressedIssues VALUES %L",
-		addressedIssuesArray,
-	);
-	const eventRulesQuery = format(
-		"INSERT INTO eventRules (eventid, rule) VALUES %L RETURNING *",
-		eventRulesArray,
-	);
-	const issueTypesQuery = format(
-		"SELECT * FROM issuetypes WHERE id IN (%L)",
-		issueIds,
-	);
-
-	const promises = [];
-
-	promises.push(pool.query(issueTypesQuery));
-	promises.push(pool.query(eventRulesQuery));
-
-	if (images && images.length > 0) {
-		const imagePromises = [];
-		images.forEach((image) => {
-			imagePromises.push(s3PutBase64Image(image));
-		});
-		const imageKeys = await Promise.all(imagePromises);
-
-		const imageKeysArray = imageKeys.map((key) => [eventId, key]);
-		const eventPicturesQuery = format(
-			"INSERT INTO eventPictures (eventid, picturepath) VALUES %L RETURNING *",
-			imageKeysArray,
+		const addressedIssuesQuery = format(
+			"INSERT INTO addressedIssues VALUES %L",
+			addressedIssuesArray,
 		);
-		promises.push(pool.query(eventPicturesQuery));
+		const eventRulesQuery = format(
+			"INSERT INTO eventRules (eventid, rule) VALUES %L RETURNING *",
+			eventRulesArray,
+		);
+		const issueTypesQuery = format(
+			"SELECT * FROM issuetypes WHERE id IN (%L)",
+			issueIds,
+		);
+
+		const promises = [];
+
+		promises.push(pool.query(issueTypesQuery));
+		promises.push(pool.query(eventRulesQuery));
+
+		if (images && images.length > 0) {
+			const imagePromises = [];
+			images.forEach((image) => {
+				imagePromises.push(s3PutBase64Image(image));
+			});
+			const imageKeys = await Promise.all(imagePromises);
+
+			const imageKeysArray = imageKeys.map((key) => [eventId, key]);
+			const eventPicturesQuery = format(
+				"INSERT INTO eventPictures (eventid, picturepath) VALUES %L RETURNING *",
+				imageKeysArray,
+			);
+			promises.push(pool.query(eventPicturesQuery));
+		}
+
+		promises.push(pool.query(addressedIssuesQuery));
+
+		const result = await Promise.all(promises);
+
+		const issueTypesResult = result[0].rows;
+		const eventRulesResult = result[1].rows;
+		const eventPicturesResult = result[2] ? result[2].rows : [];
+
+		sendResponse(res, 201, {
+			...event,
+			issues: issueTypesResult,
+			rules: eventRulesResult,
+			pictures: eventPicturesResult,
+			user: req.user,
+			participantscount: 0,
+		});
+	} catch (e) {
+		sendError(res, 400, e.message);
 	}
-
-	promises.push(pool.query(addressedIssuesQuery));
-
-	const result = await Promise.all(promises);
-
-	const issueTypesResult = result[0].rows;
-	const eventRulesResult = result[1].rows;
-	const eventPicturesResult = result[2] ? result[2].rows : [];
-
-	sendResponse(res, 201, {
-		...event,
-		issues: issueTypesResult,
-		rules: eventRulesResult,
-		pictures: eventPicturesResult,
-		user: req.user,
-		participantscount: 0,
-	});
 });
 
 //edit an event
