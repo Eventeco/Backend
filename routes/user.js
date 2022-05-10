@@ -103,26 +103,29 @@ router.patch("/", checkAuthenticated, async (req, res) => {
 	delete dataToChange.deletedAt;
 	delete dataToChange.createdAt;
 
-	if (base64) {
-		const getCurrentPicQuery = "SELECT profilepicpath FROM users WHERE id=$1";
-		const result = await pool.query(getCurrentPicQuery, [userId]);
-		const currentPicPath = result.rows[0].profilepicpath;
-		const promises = [s3PutBase64Image(base64), s3DeleteImage(currentPicPath)];
-		const results = await Promise.all(promises);
-		const newPicPath = results[0];
-		dataToChange.profilepicpath = newPicPath;
-	}
-
-	const sets = Object.entries(dataToChange).map(([key, value]) =>
-		format("%s = %L", key, value),
-	);
-	const query = format(
-		"UPDATE users SET %s, updatedAt = NOW() WHERE id = %s AND deletedAt IS NULL RETURNING *",
-		sets.join(", "),
-		userId,
-	);
-
 	try {
+		if (base64) {
+			const getCurrentPicQuery = "SELECT profilepicpath FROM users WHERE id=$1";
+			const result = await pool.query(getCurrentPicQuery, [userId]);
+			const currentPicPath = result.rows[0].profilepicpath;
+			const promises = [s3PutBase64Image(base64)];
+			if (currentPicPath) {
+				promises.push(s3DeleteImage(currentPicPath));
+			}
+			const results = await Promise.all(promises);
+			const newPicPath = results[0];
+			dataToChange.profilepicpath = newPicPath;
+		}
+
+		const sets = Object.entries(dataToChange).map(([key, value]) =>
+			format("%s = %L", key, value),
+		);
+		const query = format(
+			"UPDATE users SET %s, updatedAt = NOW() WHERE id = %s AND deletedAt IS NULL RETURNING *",
+			sets.join(", "),
+			userId,
+		);
+
 		const result = await pool.query(query);
 		if (result.rowCount === 0) {
 			return sendError(res, 404, "User not found or deleted");

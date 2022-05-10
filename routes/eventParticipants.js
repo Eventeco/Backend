@@ -72,11 +72,11 @@ router.post(
 			const results = await Promise.all(queriesPromises);
 			const maxParticipants = +results[0].rows[0].maxparticipants;
 			const currentParticipants = +results[1].rows[0].count;
-			if (currentParticipants < maxParticipants) {
+			if (!maxParticipants || currentParticipants < maxParticipants) {
 				await pool.query(query, [eventId, userId]);
 				return sendResponse(res, 201);
 			} else {
-				return sendError(res, 400, "Max participants reached!");
+				return sendError(res, 400, "Max participants reached");
 			}
 		} catch (e) {
 			sendError(res, 400, e.message);
