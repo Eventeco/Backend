@@ -1,5 +1,6 @@
 const format = require("pg-format");
 const pool = require("../dbPool");
+const { getEvent } = require("./events");
 
 const getUsers = (userIds = []) => {
 	if (userIds.length === 0) {
