@@ -143,6 +143,7 @@ router.post("/", checkAuthenticated, async (req, res) => {
 			const key = await s3PutBase64Image(coverImage);
 			eventData.picturepath = key;
 		} catch (e) {
+			console.log(e.message);
 			return sendError(res, 400, e.message);
 		}
 	}
@@ -211,6 +212,7 @@ router.post("/", checkAuthenticated, async (req, res) => {
 			participantscount: 0,
 		});
 	} catch (e) {
+		console.log(e.message);
 		sendError(res, 400, e.message);
 	}
 });
