@@ -141,7 +141,6 @@ router.post("/", checkAuthenticated, async (req, res) => {
 	if (coverImage) {
 		const key = await s3PutBase64Image(coverImage);
 		eventData.picturepath = key;
-		return sendError(res, 400, e.message);
 	}
 	const cols = Object.keys(eventData);
 	const values = Object.values(eventData);
