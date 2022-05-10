@@ -16,6 +16,9 @@ router.get("/participated", checkAuthenticated, async (req, res) => {
 
 	try {
 		const results = await pool.query(query, [userId]);
+		if (results.rows.length === 0) {
+			return sendResponse(res, 200, []);
+		}
 		const eventIds = results.rows.map((row) => row.id);
 		const eventsResult = await getEvents(eventIds);
 		sendResponse(res, 200, eventsResult.rows);
@@ -35,6 +38,9 @@ router.get("/created", checkAuthenticated, async (req, res) => {
 
 	try {
 		const results = await pool.query(updatedQuery, [userId]);
+		if (results.rows.length === 0) {
+			return sendResponse(res, 200, []);
+		}
 		const eventIds = results.rows.map((row) => row.id);
 		const eventResults = await getEvents(eventIds);
 		sendResponse(res, 200, eventResults.rows);

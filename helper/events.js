@@ -35,7 +35,7 @@ const getEvents = (eventIds = []) => {
 					JOIN issuetypes AS i ON a.issuetypeid = i.id
 					WHERE e.id IN (%s)
 					GROUP BY e.id
-					ORDER BY e.createdAt DESC`,
+					ORDER BY e.starttime DESC`,
 		eventIds,
 	);
 
